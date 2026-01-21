@@ -15,6 +15,7 @@ import swaggerSetup from './config/swagger';
 // Import routes
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
+import goldRoutes from './routes/gold';
 import healthRoutes from './routes/health';
 
 // Load environment variables
@@ -57,6 +58,7 @@ swaggerSetup(app);
 app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/gold', goldRoutes);
 
 // Error handling middleware
 app.use(notFound);
