@@ -5,7 +5,7 @@ import { NepaliDateHelper } from '../utils/nepaliDateHelper';
 import { ApiResponse, GoldRateResponse } from '../types/gold';
 import { authenticateToken } from '../middleware/auth';
 import { PrismaClient } from '@prisma/client';
-import { query, validationResult } from 'express-validator';
+import { query, body, validationResult } from 'express-validator';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -587,6 +587,325 @@ router.get('/articles',
       const response: ApiResponse = {
         responseCode: 500,
         responseMessage: 'Unable to retrieve gold articles',
+        body: { 
+          errors: [{ 
+            field: 'server', 
+            message: 'Internal server error' 
+          }] 
+        }
+      };
+
+      res.status(500).json(response);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/v1/gold/article:
+ *   post:
+ *     summary: Create a new gold article
+ *     tags: [Gold]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - articleCode
+ *               - netWeight
+ *               - grossWeight
+ *               - karat
+ *             properties:
+ *               articleCode:
+ *                 type: string
+ *                 description: Unique article code
+ *                 example: "RNC1001"
+ *               serialNumber:
+ *                 type: string
+ *                 description: Serial number (optional)
+ *                 example: "50001"
+ *               carigarNameCode:
+ *                 type: string
+ *                 description: Carigar code name (optional)
+ *                 example: "GAUTAM KR"
+ *               netWeight:
+ *                 type: number
+ *                 format: float
+ *                 description: Net weight of the article
+ *                 example: 25.50
+ *               grossWeight:
+ *                 type: number
+ *                 format: float
+ *                 description: Gross weight of the article
+ *                 example: 26.20
+ *               stoneWeight:
+ *                 type: number
+ *                 format: float
+ *                 description: Stone weight (optional, defaults to 0)
+ *                 example: 0.70
+ *               karat:
+ *                 type: integer
+ *                 description: Gold purity (24, 22, 18, 14)
+ *                 enum: [24, 22, 18, 14]
+ *                 example: 22
+ *     responses:
+ *       201:
+ *         description: Gold article created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 201
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Gold article created successfully
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     article:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         articleCode:
+ *                           type: string
+ *                         serialNumber:
+ *                           type: string
+ *                         issueDate:
+ *                           type: string
+ *                           format: date-time
+ *                         issueDateNepali:
+ *                           type: object
+ *                           properties:
+ *                             year:
+ *                               type: number
+ *                             month:
+ *                               type: number
+ *                             dayOfMonth:
+ *                               type: number
+ *                         netWeight:
+ *                           type: number
+ *                         grossWeight:
+ *                           type: number
+ *                         stoneWeight:
+ *                           type: number
+ *                         karat:
+ *                           type: integer
+ *                         carigarId:
+ *                           type: string
+ *                         createdAt:
+ *                           type: string
+ *                           format: date-time
+ *                         updatedAt:
+ *                           type: string
+ *                           format: date-time
+ *       400:
+ *         description: Validation error or article already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 400
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Article code already exists
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           field:
+ *                             type: string
+ *                           message:
+ *                             type: string
+ *       401:
+ *         description: Unauthorized - Invalid or missing access token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 401
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Access token required
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           field:
+ *                             type: string
+ *                           message:
+ *                             type: string
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 500
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Unable to create gold article
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           field:
+ *                             type: string
+ *                           message:
+ *                             type: string
+ */
+router.post('/article',
+  authenticateToken,
+  [
+    body('articleCode').notEmpty().isString().trim().withMessage('Article code is required and must be a string'),
+    body('serialNumber').optional().isString().trim().withMessage('Serial number must be a string'),
+    body('carigarNameCode').optional().isString().trim().withMessage('Carigar name code must be a string'),
+    body('netWeight').isFloat({ min: 0 }).withMessage('Net weight must be a positive number'),
+    body('grossWeight').isFloat({ min: 0 }).withMessage('Gross weight must be a positive number'),
+    body('stoneWeight').optional().isFloat({ min: 0 }).withMessage('Stone weight must be a positive number'),
+    body('karat').isInt({ min: 1 }).isIn([24, 22, 18, 14]).withMessage('Karat must be one of: 24, 22, 18, 14')
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      // Check for validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Validation failed',
+          body: {
+            errors: errors.array().map(error => ({
+              field: error.type === 'field' ? error.path : 'body',
+              message: error.msg
+            }))
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      const { 
+        articleCode, 
+        serialNumber, 
+        carigarNameCode, 
+        netWeight, 
+        grossWeight, 
+        stoneWeight = 0, 
+        karat 
+      } = req.body;
+
+      // Check if article code already exists
+      const existingArticle = await prisma.goldArticle.findFirst({
+        where: {
+          articleCode: {
+            equals: articleCode.trim(),
+            mode: 'insensitive'
+          }
+        }
+      });
+
+      if (existingArticle) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Article code already exists',
+          body: {
+            errors: [{
+              field: 'articleCode',
+              message: `Article with code '${articleCode}' already exists`
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Find carigar by codeName or use default UNKNOWN carigar
+      let carigarId = "2861c740-6155-408d-8cd1-4b63216c6ac8"; // Default UNKNOWN carigar ID
+      
+      if (carigarNameCode && carigarNameCode.trim()) {
+        const foundCarigar = await prisma.carigar.findFirst({
+          where: {
+            codeName: {
+              equals: carigarNameCode.trim(),
+              mode: 'insensitive'
+            }
+          }
+        });
+
+        if (foundCarigar) {
+          carigarId = foundCarigar.id;
+        }
+      }
+
+      // Get current date and convert to Nepali date
+      const currentDate = new Date();
+      const currentNepaliDate = NepaliDateHelper.getTodayNepaliDate();
+
+      // Create the gold article
+      const newArticle = await prisma.goldArticle.create({
+        data: {
+          articleCode: articleCode.trim(),
+          serialNumber: serialNumber ? BigInt(serialNumber) : BigInt(0),
+          issueDate: currentDate,
+          issueDateNepali: currentNepaliDate as any,
+          carigarId: carigarId,
+          netWeight: parseFloat(netWeight),
+          grossWeight: parseFloat(grossWeight),
+          stoneWeight: parseFloat(stoneWeight),
+          karat: parseInt(karat)
+        }
+      });
+
+      // Convert BigInt to string for JSON serialization
+      const serializedArticle = {
+        ...newArticle,
+        serialNumber: newArticle.serialNumber.toString()
+      };
+
+      const response: ApiResponse = {
+        responseCode: 201,
+        responseMessage: 'Gold article created successfully',
+        body: {
+          article: serializedArticle
+        }
+      };
+
+      res.status(201).json(response);
+
+    } catch (error) {
+      console.error('Article creation error:', error);
+      
+      const response: ApiResponse = {
+        responseCode: 500,
+        responseMessage: 'Unable to create gold article',
         body: { 
           errors: [{ 
             field: 'server', 
