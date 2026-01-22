@@ -182,10 +182,55 @@ async function seedGoldArticles() {
   }
 }
 
+// Customer seed data
+const customersData = [
+  {
+    firstName: 'Chandan',
+    lastName: 'Kumar',
+    phone: 9705002288n,
+    email: 'bluekanishk@gmail.com'
+  },
+  {
+    firstName: 'Rajni',
+    lastName: 'Kumari', 
+    phone: 9705002277n,
+    email: 'bluerajni@gmail.com'
+  },
+  {
+    firstName: 'Karan',
+    lastName: 'Thapa',
+    phone: 9705002266n,
+    email: null
+  }
+];
+
+async function seedCustomers() {
+  try {
+    logger.info('🔄 Starting customer seeding...');
+
+    // Delete existing customers
+    await prisma.customer.deleteMany();
+    logger.info('🗑️ Cleared existing customers');
+
+    // Create customers
+    for (const customerData of customersData) {
+      await prisma.customer.create({
+        data: customerData
+      });
+    }
+
+    logger.info(`✅ Successfully seeded ${customersData.length} customers`);
+  } catch (error) {
+    logger.error('❌ Error seeding customers:', error);
+    throw error;
+  }
+}
+
 async function main() {
   try {
     await seedCarigars();
     await seedGoldArticles();
+    await seedCustomers();
     logger.info('🎉 Database seeding completed successfully');
   } catch (error) {
     logger.error('💥 Database seeding failed:', error);

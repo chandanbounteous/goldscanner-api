@@ -52,6 +52,18 @@ model GoldArticle {
   @@map("gold_articles")
 }
 
+model Customer {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String?
+  phone     BigInt?
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("customers")
+}
+
 enum UserRole {
   ADMIN
   USER
