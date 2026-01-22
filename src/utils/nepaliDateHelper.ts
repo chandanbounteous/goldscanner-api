@@ -66,4 +66,46 @@ export class NepaliDateHelper {
     const monthName = this.nepaliMonths[date.month - 1];
     return `${date.dayOfMonth} ${monthName} ${date.year}`;
   }
+
+  /**
+   * Parse Nepali date string (DD/MM/YY or DD/MM/YYYY format) and convert to Gregorian Date
+   */
+  static parseNepaliDateString(nepaliDateStr: string): { nepaliDate: NepaliDateObject; gregorianDate: Date } {
+    const parts = nepaliDateStr.trim().split('/');
+    if (parts.length !== 3) {
+      throw new Error(`Invalid Nepali date format: ${nepaliDateStr}. Expected DD/MM/YY or DD/MM/YYYY`);
+    }
+
+    const day = parseInt(parts[0] ?? '0');
+    const month = parseInt(parts[1] ?? '0');
+    let year = parseInt(parts[2] ?? '0');
+
+    // Handle both 2-digit and 4-digit years
+    if (year < 100) {
+      // Convert 2-digit year to 4-digit (assuming 20xx for years 00-30, 19xx for years 31-99)
+      if (year <= 30) {
+        year = 2000 + year;
+      } else {
+        year = 1900 + year;
+      }
+    }
+    // 4-digit years are used as-is
+
+    const nepaliDate: NepaliDateObject = {
+      year,
+      month,
+      dayOfMonth: day
+    };
+
+    // For now, let's use a simple approximation to convert Nepali to Gregorian
+    // This is not 100% accurate but will work for seeding purposes
+    // Nepali calendar is roughly 56.7 years behind Gregorian calendar
+    const approximateGregorianYear = year - 57;
+    const gregorianDate = new Date(approximateGregorianYear, month - 1, day);
+
+    return {
+      nepaliDate,
+      gregorianDate
+    };
+  }
 }

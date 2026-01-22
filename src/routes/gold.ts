@@ -4,8 +4,11 @@ import { GoldCalculator } from '../utils/goldCalculator';
 import { NepaliDateHelper } from '../utils/nepaliDateHelper';
 import { ApiResponse, GoldRateResponse } from '../types/gold';
 import { authenticateToken } from '../middleware/auth';
+import { PrismaClient } from '@prisma/client';
+import { query, validationResult } from 'express-validator';
 
 const router = Router();
+const prisma = new PrismaClient();
 
 /**
  * @swagger
@@ -157,6 +160,7 @@ router.get('/currentrate', authenticateToken, async (req: Request, res: Response
 
     // Calculate rates for different karats
     const roundedRates = GoldCalculator.calculateGoldRates(rateAtDate.rate);
+    console.log('Calculated gold rates:', JSON.stringify(roundedRates, null, 2));
     
     const response: GoldRateResponse = {
       responseCode: 200,
@@ -285,6 +289,7 @@ router.post('/calculate', authenticateToken, async (req: Request, res: Response)
     }
 
     const roundedRates = GoldCalculator.calculateGoldRates(pureGoldRate);
+    console.log('Calculated gold rates:', JSON.stringify(roundedRates, null, 2));
 
     const response: ApiResponse = {
       responseCode: 200,
@@ -313,5 +318,286 @@ router.post('/calculate', authenticateToken, async (req: Request, res: Response)
     res.status(500).json(response);
   }
 });
+
+/**
+ * @swagger
+ * /api/v1/gold/articles:
+ *   get:
+ *     summary: Get gold articles with optional filtering and pagination
+ *     tags: [Gold]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         description: Filter articles by article code (case insensitive, partial match)
+ *         example: "RNC"
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *         description: Number of records to skip for pagination
+ *         example: 0
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Maximum number of records to return
+ *         example: 50
+ *     responses:
+ *       200:
+ *         description: Gold articles retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 200
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Gold articles retrieved successfully
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     articles:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           articleCode:
+ *                             type: string
+ *                           serialNumber:
+ *                             type: string
+ *                           issueDate:
+ *                             type: string
+ *                             format: date-time
+ *                           issueDateNepali:
+ *                             type: object
+ *                             properties:
+ *                               year:
+ *                                 type: number
+ *                               month:
+ *                                 type: number
+ *                               dayOfMonth:
+ *                                 type: number
+ *                           netWeight:
+ *                             type: number
+ *                           grossWeight:
+ *                             type: number
+ *                           stoneWeight:
+ *                             type: number
+ *                           karat:
+ *                             type: integer
+ *                           carigar:
+ *                             type: object
+ *                             properties:
+ *                               id:
+ *                                 type: string
+ *                               codeName:
+ *                                 type: string
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         offset:
+ *                           type: integer
+ *                         limit:
+ *                           type: integer
+ *                         total:
+ *                           type: integer
+ *                         hasMore:
+ *                           type: boolean
+ *       400:
+ *         description: Invalid query parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 400
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Invalid query parameters
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           field:
+ *                             type: string
+ *                           message:
+ *                             type: string
+ *       401:
+ *         description: Unauthorized - Invalid or missing access token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 401
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Access token required
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           field:
+ *                             type: string
+ *                           message:
+ *                             type: string
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 500
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Unable to retrieve gold articles
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           field:
+ *                             type: string
+ *                           message:
+ *                             type: string
+ */
+router.get('/articles', 
+  authenticateToken,
+  [
+    query('code').optional().isString().trim().withMessage('Code must be a string'),
+    query('offset').optional().isInt({ min: 0 }).withMessage('Offset must be a non-negative integer'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be an integer between 1 and 100')
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      // Check for validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Invalid query parameters',
+          body: {
+            errors: errors.array().map(error => ({
+              field: error.type === 'field' ? error.path : 'query',
+              message: error.msg
+            }))
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Extract and validate query parameters
+      const code = (req.query.code as string) || '';
+      const offset = parseInt(req.query.offset as string) || 0;
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      // Build the where clause for filtering
+      const whereClause = code.trim() ? {
+        articleCode: {
+          contains: code.trim(),
+          mode: 'insensitive' as const
+        }
+      } : {};
+
+      // Get total count for pagination
+      const totalCount = await prisma.goldArticle.count({
+        where: whereClause
+      });
+
+      // Fetch articles with pagination and include carigar data
+      const articles = await prisma.goldArticle.findMany({
+        where: whereClause,
+        skip: offset,
+        take: limit,
+        orderBy: {
+          articleCode: 'asc'
+        },
+        include: {
+          carigar: {
+            select: {
+              id: true,
+              codeName: true
+            }
+          }
+        }
+      });
+
+      // Convert BigInt to string for JSON serialization
+      const serializedArticles = articles.map(article => ({
+        ...article,
+        serialNumber: article.serialNumber.toString()
+      }));
+
+      const response: ApiResponse = {
+        responseCode: 200,
+        responseMessage: 'Gold articles retrieved successfully',
+        body: {
+          articles: serializedArticles,
+          pagination: {
+            offset,
+            limit,
+            total: totalCount,
+            hasMore: offset + limit < totalCount
+          }
+        }
+      };
+
+      res.status(200).json(response);
+
+    } catch (error) {
+      console.error('Articles retrieval error:', error);
+      
+      const response: ApiResponse = {
+        responseCode: 500,
+        responseMessage: 'Unable to retrieve gold articles',
+        body: { 
+          errors: [{ 
+            field: 'server', 
+            message: 'Internal server error' 
+          }] 
+        }
+      };
+
+      res.status(500).json(response);
+    }
+  }
+);
 
 export default router;

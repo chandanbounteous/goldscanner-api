@@ -9,7 +9,6 @@ datasource db {
 
 model User {
   id        String   @id @default(uuid())
-  phone     BigInt   @unique
   username  String   @unique
   password  String
   firstName String?
@@ -18,12 +17,42 @@ model User {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  phone     BigInt   @unique
 
   @@map("users")
+}
+
+model Carigar {
+  id           String        @id @default(uuid())
+  codeName     String        @unique
+  phone        String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  goldArticles GoldArticle[]
+
+  @@map("carigars")
+}
+
+model GoldArticle {
+  id              String   @id @default(uuid())
+  articleCode     String
+  serialNumber    BigInt
+  issueDate       DateTime
+  issueDateNepali Json
+  carigarId       String
+  netWeight       Float
+  grossWeight     Float
+  stoneWeight     Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  karat           Int      @default(24)
+  carigar         Carigar  @relation(fields: [carigarId], references: [id])
+
+  @@map("gold_articles")
 }
 
 enum UserRole {
   ADMIN
   USER
 }
-
