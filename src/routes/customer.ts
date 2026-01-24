@@ -1314,4 +1314,332 @@ router.get('/basket/:basketId',
   }
 );
 
+/**
+ * @swagger
+ * /api/v1/customer/basket/{basketId}:
+ *   patch:
+ *     summary: Update specific fields of a customer basket
+ *     tags: [Customer]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: basketId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Basket ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               oldGoldItemCost:
+ *                 type: number
+ *                 format: float
+ *                 description: Cost of old gold items
+ *                 example: 5000
+ *               extraDiscount:
+ *                 type: number
+ *                 format: float
+ *                 description: Extra discount amount
+ *                 example: 1000
+ *               luxuryTax:
+ *                 type: number
+ *                 format: float
+ *                 description: Luxury tax amount
+ *                 example: 2500
+ *               finalCost:
+ *                 type: number
+ *                 format: float
+ *                 description: Final cost of the basket
+ *                 example: 55000
+ *               isBilled:
+ *                 type: boolean
+ *                 description: Whether the basket is billed
+ *                 example: true
+ *               billingDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Billing date in ISO format
+ *                 example: "2024-01-24T10:30:00Z"
+ *               billingDateNepali:
+ *                 type: object
+ *                 description: Billing date in Nepali calendar
+ *                 properties:
+ *                   year:
+ *                     type: number
+ *                   month:
+ *                     type: number
+ *                   dayOfMonth:
+ *                     type: number
+ *                 example: {"year": 2081, "month": 10, "dayOfMonth": 15}
+ *               discardedDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Discard date in ISO format
+ *                 example: "2024-01-24T10:30:00Z"
+ *               discardedDateNepali:
+ *                 type: object
+ *                 description: Discard date in Nepali calendar
+ *                 properties:
+ *                   year:
+ *                     type: number
+ *                   month:
+ *                     type: number
+ *                   dayOfMonth:
+ *                     type: number
+ *                 example: {"year": 2081, "month": 10, "dayOfMonth": 15}
+ *               isDiscarded:
+ *                 type: boolean
+ *                 description: Whether the basket is discarded
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Basket updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 200
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Basket updated successfully
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     basket:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         basketNumber:
+ *                           type: number
+ *                         customerId:
+ *                           type: string
+ *                         oldGoldItemCost:
+ *                           type: number
+ *                         extraDiscount:
+ *                           type: number
+ *                         luxuryTax:
+ *                           type: number
+ *                         finalCost:
+ *                           type: number
+ *                         isBilled:
+ *                           type: boolean
+ *                         isDiscarded:
+ *                           type: boolean
+ *                         billingDate:
+ *                           type: string
+ *                           format: date-time
+ *                         discardedDate:
+ *                           type: string
+ *                           format: date-time
+ *                         updatedAt:
+ *                           type: string
+ *                           format: date-time
+ *       400:
+ *         description: Validation error or basket not open for updates
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 400
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Cannot update basket - basket is already billed or discarded
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       404:
+ *         description: Basket not found
+ *       500:
+ *         description: Internal server error
+ */
+router.patch('/basket/:basketId',
+  authenticateToken,
+  [
+    param('basketId').isUUID().withMessage('Basket ID must be a valid UUID'),
+    body('oldGoldItemCost').optional().isFloat({ min: 0 }).withMessage('Old gold item cost must be a positive number'),
+    body('extraDiscount').optional().isFloat({ min: 0 }).withMessage('Extra discount must be a positive number'),
+    body('luxuryTax').optional().isFloat({ min: 0 }).withMessage('Luxury tax must be a positive number'),
+    body('finalCost').optional().isFloat({ min: 0 }).withMessage('Final cost must be a positive number'),
+    body('isBilled').optional().isBoolean().withMessage('isBilled must be a boolean'),
+    body('billingDate').optional().isISO8601().withMessage('Billing date must be a valid ISO 8601 date'),
+    body('billingDateNepali').optional().isObject().withMessage('Billing date Nepali must be an object'),
+    body('billingDateNepali.year').optional().isInt({ min: 1900, max: 3000 }).withMessage('Nepali year must be a valid integer'),
+    body('billingDateNepali.month').optional().isInt({ min: 1, max: 12 }).withMessage('Nepali month must be between 1 and 12'),
+    body('billingDateNepali.dayOfMonth').optional().isInt({ min: 1, max: 32 }).withMessage('Nepali day must be between 1 and 32'),
+    body('discardedDate').optional().isISO8601().withMessage('Discarded date must be a valid ISO 8601 date'),
+    body('discardedDateNepali').optional().isObject().withMessage('Discarded date Nepali must be an object'),
+    body('discardedDateNepali.year').optional().isInt({ min: 1900, max: 3000 }).withMessage('Nepali year must be a valid integer'),
+    body('discardedDateNepali.month').optional().isInt({ min: 1, max: 12 }).withMessage('Nepali month must be between 1 and 12'),
+    body('discardedDateNepali.dayOfMonth').optional().isInt({ min: 1, max: 32 }).withMessage('Nepali day must be between 1 and 32'),
+    body('isDiscarded').optional().isBoolean().withMessage('isDiscarded must be a boolean')
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      // Check for validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Validation failed',
+          body: {
+            errors: errors.array().map(error => ({
+              field: error.type === 'field' ? error.path : 'body',
+              message: error.msg
+            }))
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      const basketId = req.params.basketId as string;
+      const {
+        oldGoldItemCost,
+        extraDiscount,
+        luxuryTax,
+        finalCost,
+        isBilled,
+        billingDate,
+        billingDateNepali,
+        discardedDate,
+        discardedDateNepali,
+        isDiscarded
+      } = req.body;
+
+      // Check if basket exists
+      const existingBasket = await prisma.customerBasket.findUnique({
+        where: { id: basketId }
+      });
+
+      if (!existingBasket) {
+        const response: ApiResponse = {
+          responseCode: 404,
+          responseMessage: 'Basket not found',
+          body: {
+            errors: [{
+              field: 'basketId',
+              message: 'Basket with the provided ID does not exist'
+            }]
+          }
+        };
+        res.status(404).json(response);
+        return;
+      }
+
+      // Check if basket is open for updates (not billed and not discarded)
+      if (existingBasket.isBilled || existingBasket.isDiscarded) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Cannot update basket - basket is already billed or discarded',
+          body: {
+            errors: [{
+              field: 'basket',
+              message: 'Updates can only be made to open baskets (not billed and not discarded)'
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Prepare update data with only provided fields
+      const updateData: any = {};
+      
+      if (oldGoldItemCost !== undefined) updateData.oldGoldItemCost = parseFloat(oldGoldItemCost);
+      if (extraDiscount !== undefined) updateData.extraDiscount = parseFloat(extraDiscount);
+      if (luxuryTax !== undefined) updateData.luxuryTax = parseFloat(luxuryTax);
+      if (finalCost !== undefined) updateData.finalCost = parseFloat(finalCost);
+      if (isBilled !== undefined) updateData.isBilled = isBilled;
+      if (billingDate !== undefined) updateData.billingDate = new Date(billingDate);
+      if (billingDateNepali !== undefined) updateData.billingDateNepali = billingDateNepali;
+      if (discardedDate !== undefined) updateData.discardedDate = new Date(discardedDate);
+      if (discardedDateNepali !== undefined) updateData.discardedDateNepali = discardedDateNepali;
+      if (isDiscarded !== undefined) updateData.isDiscarded = isDiscarded;
+
+      // Check if at least one field is provided for update
+      if (Object.keys(updateData).length === 0) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'No valid fields provided for update',
+          body: {
+            errors: [{
+              field: 'body',
+              message: 'At least one valid field must be provided for update'
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Update the basket
+      const updatedBasket = await prisma.customerBasket.update({
+        where: { id: basketId },
+        data: updateData
+      });
+
+      const response: ApiResponse = {
+        responseCode: 200,
+        responseMessage: 'Basket updated successfully',
+        body: {
+          basket: {
+            id: updatedBasket.id,
+            basketNumber: updatedBasket.basketNumber,
+            customerId: updatedBasket.customerId,
+            isGoldRateFixed: updatedBasket.isGoldRateFixed,
+            fixedGoldRate24KPerTola: updatedBasket.fixedGoldRate24KPerTola,
+            fixedGoldRateNepaliDate: updatedBasket.fixedGoldRateNepaliDate,
+            oldGoldItemCost: updatedBasket.oldGoldItemCost,
+            extraDiscount: updatedBasket.extraDiscount,
+            luxuryTax: updatedBasket.luxuryTax,
+            finalCost: updatedBasket.finalCost,
+            isBilled: updatedBasket.isBilled,
+            isDiscarded: updatedBasket.isDiscarded,
+            billingDate: updatedBasket.billingDate,
+            billingDateNepali: updatedBasket.billingDateNepali,
+            discardedDate: updatedBasket.discardedDate,
+            discardedDateNepali: updatedBasket.discardedDateNepali,
+            createdAt: updatedBasket.createdAt,
+            updatedAt: updatedBasket.updatedAt
+          }
+        }
+      };
+
+      res.status(200).json(response);
+
+    } catch (error) {
+      console.error('Basket update error:', error);
+      
+      const response: ApiResponse = {
+        responseCode: 500,
+        responseMessage: 'Unable to update basket',
+        body: { 
+          errors: [{ 
+            field: 'server', 
+            message: 'Internal server error' 
+          }] 
+        }
+      };
+
+      res.status(500).json(response);
+    }
+  }
+);
+
 export default router;
