@@ -48,6 +48,7 @@ model GoldArticle {
   updatedAt       DateTime @updatedAt
   karat           Int      @default(24)
   carigar         Carigar  @relation(fields: [carigarId], references: [id])
+  basketArticles  CustomerBasketArticles[]
 
   @@map("gold_articles")
 }
@@ -60,8 +61,52 @@ model Customer {
   email     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  baskets   CustomerBasket[]
 
   @@map("customers")
+}
+
+model CustomerBasket {
+  id                      String   @id @default(uuid())
+  basketNumber            Int      @unique
+  customerId              String
+  isGoldRateFixed         Boolean  @default(false)
+  fixedGoldRate24KPerTola Float?
+  fixedGoldRateNepaliDate Json?
+  oldGoldItemCost         Float    @default(0)
+  extraDiscount           Float    @default(0)
+  luxuryTax               Float    @default(0)
+  finalCost               Float?
+  isBilled                Boolean  @default(false)
+  billingDate             DateTime?
+  billingDateNepali       Json?
+  isDiscarded             Boolean  @default(false)
+  discardedDate           DateTime?
+  discardedDateNepali     Json?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  
+  customer                Customer @relation(fields: [customerId], references: [id])
+  articles                CustomerBasketArticles[]
+
+  @@map("customer_baskets")
+}
+
+model CustomerBasketArticles {
+  id           String  @id @default(uuid())
+  basketId     String
+  articleId    String
+  netWeight    Float
+  grossWeight  Float
+  addOnCost    Float   @default(0)
+  wastage      Float   @default(0)
+  makingCharge Float
+  discount     Float   @default(0)
+  
+  basket       CustomerBasket @relation(fields: [basketId], references: [id])
+  article      GoldArticle    @relation(fields: [articleId], references: [id])
+
+  @@map("customer_basket_articles")
 }
 
 enum UserRole {
