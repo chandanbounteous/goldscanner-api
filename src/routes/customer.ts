@@ -5,7 +5,10 @@ import { authenticateToken } from '../middleware/auth';
 import { ApiResponse } from '../types/auth';
 import { BasketService } from '../services/basketService';
 import { GoldRateFetcher } from '../services/goldRateFetcher';
+import { NepaliDateHelper } from '../utils/nepaliDateHelper';
+import NepaliDate, { BStoAD, ADtoBS } from 'nepali-date-library';
 import { logger } from '../utils/logger';
+import { equal } from 'node:assert';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -2150,6 +2153,544 @@ router.patch('/basket/article/:id',
       const response: ApiResponse = {
         responseCode: 500,
         responseMessage: 'Unable to update article in basket',
+        body: { 
+          errors: [{ 
+            field: 'server', 
+            message: 'Internal server error' 
+          }] 
+        }
+      };
+
+      res.status(500).json(response);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/v1/customer/basket/search:
+ *   post:
+ *     summary: Search for customer baskets based on criteria
+ *     tags: [Customer]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               customerName:
+ *                 type: string
+ *                 description: Customer name to search for
+ *                 example: "John Doe"
+ *                 default: ""
+ *               phone:
+ *                 type: string
+ *                 description: Customer phone number
+ *                 example: "9876543210"
+ *               startDate:
+ *                 type: string
+ *                 description: Start date in Nepali calendar format yyyy-mm-dd (defaults to current Nepali date)
+ *                 example: "2081-10-01"
+ *               endDate:
+ *                 type: string
+ *                 description: End date in Nepali calendar format yyyy-mm-dd (defaults to current Nepali date)
+ *                 example: "2081-10-15"
+ *               includeBilled:
+ *                 type: boolean
+ *                 description: Whether to include billed baskets
+ *                 example: true
+ *                 default: true
+ *               includeDiscarded:
+ *                 type: boolean
+ *                 description: Whether to include discarded baskets
+ *                 example: false
+ *                 default: false
+ *               offset:
+ *                 type: number
+ *                 description: Number of records to skip for pagination
+ *                 example: 0
+ *                 default: 0
+ *               limit:
+ *                 type: number
+ *                 description: Maximum number of records to return
+ *                 example: 20
+ *                 default: 20
+ *     responses:
+ *       200:
+ *         description: Baskets retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 200
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Baskets retrieved successfully
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     baskets:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           basketNumber:
+ *                             type: number
+ *                           date:
+ *                             type: string
+ *                             format: date-time
+ *                             description: Created date as Gregorian date object
+ *                           nepaliDate:
+ *                             type: object
+ *                             description: Created date in Nepali format
+ *                             properties:
+ *                               year:
+ *                                 type: number
+ *                               month:
+ *                                 type: number
+ *                               dayOfMonth:
+ *                                 type: number
+ *                           firstName:
+ *                             type: string
+ *                           lastName:
+ *                             type: string
+ *                           phone:
+ *                             type: string
+ *                           count:
+ *                             type: number
+ *                             description: Total articles in basket
+ *                           isBilled:
+ *                             type: boolean
+ *                           billingDateNepali:
+ *                             type: object
+ *                           isDiscarded:
+ *                             type: boolean
+ *                           discardedDateNepali:
+ *                             type: object
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         offset:
+ *                           type: number
+ *                         limit:
+ *                           type: number
+ *                         total:
+ *                           type: number
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/basket/search',
+  authenticateToken,
+  [
+    body('customerName').optional().isString().trim().withMessage('Customer name must be a string'),
+    body('phone').optional().isString().trim().withMessage('Phone must be a string'),
+    body('startDate').optional().isString().matches(/^\d{4}-\d{1,2}-\d{1,2}$/).withMessage('Start date must be in yyyy-mm-dd format'),
+    body('endDate').optional().isString().matches(/^\d{4}-\d{1,2}-\d{1,2}$/).withMessage('End date must be in yyyy-mm-dd format'),
+    body('includeBilled').optional().isBoolean().withMessage('includeBilled must be a boolean'),
+    body('includeDiscarded').optional().isBoolean().withMessage('includeDiscarded must be a boolean'),
+    body('offset').optional().isInt({ min: 0 }).withMessage('Offset must be a non-negative integer'),
+    body('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
+  ],
+  async (req: Request, res: Response) => {
+    const LOG_BASKET_SEARCH = process.env.LOG_BASKET_SEARCH === 'true';
+    
+    try {
+      if (LOG_BASKET_SEARCH) {
+        console.log('[BASKET_SEARCH] Starting basket search request', {
+          timestamp: new Date().toISOString(),
+          requestBody: req.body
+        });
+      }
+
+      // Check for validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        if (LOG_BASKET_SEARCH) {
+          console.log('[BASKET_SEARCH] Validation failed', {
+            errors: errors.array()
+          });
+        }
+        
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Validation failed',
+          body: {
+            errors: errors.array().map(error => ({
+              field: error.type === 'field' ? error.path : 'body',
+              message: error.msg
+            }))
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Extract and set defaults for request parameters
+      const {
+        customerName = '',
+        phone,
+        startDate,
+        endDate,
+        includeBilled,
+        includeDiscarded = false,
+        offset = 0,
+        limit = 20
+      } = req.body;
+
+      if (LOG_BASKET_SEARCH) {
+        console.log('[BASKET_SEARCH] Extracted request parameters', {
+          customerName,
+          phone,
+          startDate,
+          endDate,
+          includeBilled,
+          includeDiscarded,
+          offset,
+          limit
+        });
+      }
+
+      // Get current Gregorian date as default if dates not provided
+      const currentDate = new Date();
+      const currentNepaliDateObj = NepaliDateHelper.getTodayNepaliDate();
+      const currentNepaliDateString = `${currentNepaliDateObj.year}-${currentNepaliDateObj.month.toString().padStart(2, '0')}-${currentNepaliDateObj.dayOfMonth.toString().padStart(2, '0')}`;
+
+      // Parse dates using nepali-date-library BStoAD method
+      let startDateGregorian: Date;
+      let endDateGregorian: Date;
+      let effectiveStartDateString: string;
+      let effectiveEndDateString: string;
+
+      if (startDate) {
+        try {
+          // Normalize yyyy-mm-dd format by padding single digits
+          const [year, month, day] = startDate.split('-');
+          const normalizedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          const gregorianDateStr = BStoAD(normalizedDate);
+          startDateGregorian = new Date(gregorianDateStr);
+          effectiveStartDateString = startDate;
+          if (LOG_BASKET_SEARCH) {
+            console.log('[BASKET_SEARCH] Parsed start date successfully', { 
+              nepaliInput: startDate,
+              normalizedInput: normalizedDate, 
+              gregorianOutput: gregorianDateStr, 
+              startDateGregorian 
+            });
+          }
+        } catch (error) {
+          if (LOG_BASKET_SEARCH) {
+            console.log('[BASKET_SEARCH] Error parsing start date, using current date', { startDate, error });
+          }
+          startDateGregorian = new Date(currentDate);
+          effectiveStartDateString = currentNepaliDateString;
+        }
+      } else {
+        startDateGregorian = new Date(currentDate);
+        effectiveStartDateString = currentNepaliDateString;
+      }
+
+      if (endDate) {
+        try {
+          // Normalize yyyy-mm-dd format by padding single digits
+          const [year, month, day] = endDate.split('-');
+          const normalizedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          const gregorianDateStr = BStoAD(normalizedDate);
+          endDateGregorian = new Date(gregorianDateStr);
+          effectiveEndDateString = endDate;
+          if (LOG_BASKET_SEARCH) {
+            console.log('[BASKET_SEARCH] Parsed end date successfully', { 
+              nepaliInput: endDate,
+              normalizedInput: normalizedDate, 
+              gregorianOutput: gregorianDateStr, 
+              endDateGregorian 
+            });
+          }
+        } catch (error) {
+          if (LOG_BASKET_SEARCH) {
+            console.log('[BASKET_SEARCH] Error parsing end date, using current date', { endDate, error });
+          }
+          endDateGregorian = new Date(currentDate);
+          effectiveEndDateString = currentNepaliDateString;
+        }
+      } else {
+        endDateGregorian = new Date(currentDate);
+        effectiveEndDateString = currentNepaliDateString;
+      }
+
+      // Set start date to beginning of day and end date to end of day
+      startDateGregorian.setHours(0, 0, 0, 0);
+      endDateGregorian.setHours(23, 59, 59, 999);
+
+      if (LOG_BASKET_SEARCH) {
+        console.log('[BASKET_SEARCH] Date processing completed', {
+          effectiveStartDateString,
+          effectiveEndDateString,
+          startDateGregorian,
+          endDateGregorian
+        });
+      }
+
+
+
+      // Build where clause for filtering
+      const whereClause: any = {
+        createdAt: {
+          gte: startDateGregorian,
+          lte: endDateGregorian
+        }
+      };
+
+      // Add customer name filter if provided
+      if (customerName && customerName.trim()) {
+        whereClause.customer = {
+          OR: [
+            { firstName: { contains: customerName.trim(), mode: 'insensitive' } },
+            { lastName: { contains: customerName.trim(), mode: 'insensitive' } }
+          ]
+        };
+      }
+
+      // Add phone filter if provided
+      if (phone) {
+        if (!whereClause.customer) {
+          whereClause.customer = {};
+        }
+        if (whereClause.customer.OR) {
+          whereClause.customer.OR.push({ phone: { equals: phone.trim() } });
+        } else {
+          whereClause.customer.phone = { equals: phone.trim() };
+        }
+      }
+
+      // Add billing/discard status filters
+      const statusConditions: any[] = [];
+      
+      // Handle includeBilled logic
+      if (includeBilled !== undefined) {
+        // If includeBilled is explicitly provided, filter based on its value
+        if (includeBilled) {
+          statusConditions.push({ isBilled: true });
+        } else {
+          statusConditions.push({ isBilled: false });
+        }
+      }
+      // If includeBilled is not provided, don't add any isBilled filter (include all)
+
+      // Handle includeDiscarded logic
+      if (includeDiscarded) {
+        // If includeDiscarded is true, only include discarded records
+        if (statusConditions.length > 0) {
+          // Combine with existing conditions using AND
+          const existingConditions = statusConditions;
+          statusConditions.length = 0; // Clear array
+          statusConditions.push({
+            AND: [
+              { OR: existingConditions },
+              { isDiscarded: true }
+            ]
+          });
+        } else {
+          statusConditions.push({ isDiscarded: true });
+        }
+      } else {
+        // If includeDiscarded is false or not provided, only include non-discarded records
+        if (statusConditions.length > 0) {
+          // Combine with existing conditions using AND
+          const existingConditions = statusConditions;
+          statusConditions.length = 0; // Clear array
+          statusConditions.push({
+            AND: [
+              { OR: existingConditions },
+              { isDiscarded: false }
+            ]
+          });
+        } else {
+          statusConditions.push({ isDiscarded: false });
+        }
+      }
+
+      // Apply status conditions to where clause
+      if (statusConditions.length > 0) {
+        if (statusConditions.length === 1) {
+          // If only one condition, apply it directly
+          Object.assign(whereClause, statusConditions[0]);
+        } else {
+          // If multiple conditions, combine them with OR
+          whereClause.OR = statusConditions;
+        }
+      }
+
+      if (LOG_BASKET_SEARCH) {
+        console.log('[BASKET_SEARCH] Where clause built', {
+          whereClause: JSON.stringify(whereClause, null, 2),
+          statusConditions
+        });
+      }
+
+      // Get total count for pagination
+      const countStartTime = Date.now();
+      const totalCount = await prisma.customerBasket.count({
+        where: whereClause
+      });
+      const countDuration = Date.now() - countStartTime;
+
+      if (LOG_BASKET_SEARCH) {
+        console.log('[BASKET_SEARCH] Count query completed', {
+          totalCount,
+          countDuration: `${countDuration}ms`
+        });
+      }
+
+      // Fetch baskets with customer details and article count
+      const fetchStartTime = Date.now();
+      const baskets = await prisma.customerBasket.findMany({
+        where: whereClause,
+        include: {
+          customer: {
+            select: {
+              firstName: true,
+              lastName: true,
+              phone: true
+            }
+          },
+          _count: {
+            select: {
+              articles: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip: offset,
+        take: limit
+      });
+      const fetchDuration = Date.now() - fetchStartTime;
+
+      if (LOG_BASKET_SEARCH) {
+        console.log('[BASKET_SEARCH] Fetch query completed', {
+          basketsFound: baskets.length,
+          fetchDuration: `${fetchDuration}ms`,
+          offset,
+          limit
+        });
+      }
+
+      // Convert Gregorian dates to Nepali format for response
+      const convertGregorianToNepaliDate = (gregorianDate: Date): any => {
+        try {
+          const year = gregorianDate.getFullYear();
+          const month = String(gregorianDate.getMonth() + 1).padStart(2, '0'); // getMonth() returns 0-11
+          const day = String(gregorianDate.getDate()).padStart(2, '0');
+          const gregorianDateStr = `${year}-${month}-${day}`;
+          
+          const nepaliDateStr = ADtoBS(gregorianDateStr);
+          const [nepaliYear, nepaliMonth, nepaliDay] = nepaliDateStr.split('-').map(Number);
+          
+          return {
+            year: nepaliYear,
+            month: nepaliMonth,
+            dayOfMonth: nepaliDay
+          };
+        } catch (error) {
+          // Fallback to approximate conversion if library fails
+          const gregorianYear = gregorianDate.getFullYear();
+          const nepaliYear = gregorianYear + 57; // Rough conversion
+          const nepaliMonth = gregorianDate.getMonth() + 1;
+          const nepaliDay = gregorianDate.getDate();
+          
+          return {
+            year: nepaliYear,
+            month: nepaliMonth,
+            dayOfMonth: nepaliDay
+          };
+        }
+      };
+
+      // Format the response
+      const formatStartTime = Date.now();
+      const formattedBaskets = baskets.map(basket => {
+        const gregorianCreatedDate = basket.createdAt;
+        const nepaliCreatedDate = convertGregorianToNepaliDate(basket.createdAt);
+        
+        const basketData: any = {
+          id: basket.id,
+          basketNumber: basket.basketNumber,
+          date: gregorianCreatedDate, // Gregorian date object
+          nepaliDate: nepaliCreatedDate, // Nepali date object
+          firstName: basket.customer.firstName,
+          lastName: basket.customer.lastName,
+          phone: basket.customer.phone ? basket.customer.phone.toString() : null,
+          count: basket._count.articles,
+          isBilled: basket.isBilled,
+          billingDateNepali: basket.billingDateNepali
+        };
+
+        // Include discard information only if discarded records are being included
+        if (includeDiscarded) {
+          basketData.isDiscarded = basket.isDiscarded;
+          basketData.discardedDateNepali = basket.discardedDateNepali;
+        }
+
+        return basketData;
+      });
+      const formatDuration = Date.now() - formatStartTime;
+
+      if (LOG_BASKET_SEARCH) {
+        console.log('[BASKET_SEARCH] Response formatting completed', {
+          formattedBasketsCount: formattedBaskets.length,
+          formatDuration: `${formatDuration}ms`,
+          totalProcessingTime: `${Date.now() - (req as any).startTime || 'N/A'}ms`
+        });
+      }
+
+      const response: ApiResponse = {
+        responseCode: 200,
+        responseMessage: 'Baskets retrieved successfully',
+        body: {
+          baskets: formattedBaskets,
+          pagination: {
+            offset,
+            limit,
+            total: totalCount
+          }
+        }
+      };
+
+      if (LOG_BASKET_SEARCH) {
+        console.log('[BASKET_SEARCH] Search completed successfully', {
+          totalRecords: totalCount,
+          returnedRecords: formattedBaskets.length,
+          responseCode: 200
+        });
+      }
+
+      res.status(200).json(response);
+
+    } catch (error) {
+      if (LOG_BASKET_SEARCH) {
+        console.log('[BASKET_SEARCH] Error occurred', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      console.error('Basket search error:', error);
+      
+      const response: ApiResponse = {
+        responseCode: 500,
+        responseMessage: 'Unable to search baskets',
         body: { 
           errors: [{ 
             field: 'server', 
