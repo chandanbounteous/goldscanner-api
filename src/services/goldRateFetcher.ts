@@ -16,10 +16,13 @@ export class GoldRateFetcher {
   static async getCurrentGoldRate(): Promise<RateAtDateWithCache | null> {
     try {
       const currentNepaliDate = NepaliDateHelper.getTodayNepaliDate();
+      logger.info(`Current Nepali Date: ${NepaliDateHelper.formatNepaliDate(currentNepaliDate)}`);
       const cacheKey = NepaliDateHelper.generateCacheKey(currentNepaliDate);
+      logger.info(`Cache Key: ${cacheKey}`);
 
       // Try to get from Redis cache first
-      const cachedRate = await this.getCachedRate(cacheKey);
+        const cachedRate = await this.getCachedRate(cacheKey);
+        logger.info(`Cached Rate: ${JSON.stringify(cachedRate)}`);
       
       if (cachedRate && NepaliDateHelper.datesAreEqual(cachedRate.date, currentNepaliDate)) {
         logger.info('Gold rate retrieved from cache');
@@ -54,7 +57,8 @@ export class GoldRateFetcher {
    */
   private static async getCachedRate(cacheKey: string): Promise<RateAtDate | null> {
     try {
-      const cached = await redisClient.get(cacheKey);
+        const cached = await redisClient.get(cacheKey);
+        logger.info(`Cached data for key ${cacheKey}: ${cached}`);
       if (cached) {
         return JSON.parse(cached) as RateAtDate;
       }
@@ -76,7 +80,8 @@ export class GoldRateFetcher {
         return null;
       }
 
-      const rateAtDate = this.extractFineGoldPerTola(html);
+        const rateAtDate = this.extractFineGoldPerTola(html);
+        logger.info(`Extracted Rate At Date: ${JSON.stringify(rateAtDate)}`);
       if (!rateAtDate) {
         logger.error('Failed to extract gold rate from HTML');
         return null;

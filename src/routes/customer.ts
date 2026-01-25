@@ -767,6 +767,12 @@ router.post('/:customerId/basket',
  *                           type: number
  *                         discount:
  *                           type: number
+ *                         createdAt:
+ *                           type: string
+ *                           format: date-time
+ *                         updatedAt:
+ *                           type: string
+ *                           format: date-time
  *       400:
  *         description: Validation error
  *         content:
@@ -958,7 +964,9 @@ router.post('/basket/:basketId/article',
             addOnCost: basketArticle.addOnCost,
             wastage: basketArticle.wastage,
             makingCharge: basketArticle.makingCharge,
-            discount: basketArticle.discount
+            discount: basketArticle.discount,
+            createdAt: basketArticle.createdAt,
+            updatedAt: basketArticle.updatedAt
           }
         }
       };
@@ -1629,6 +1637,519 @@ router.patch('/basket/:basketId',
       const response: ApiResponse = {
         responseCode: 500,
         responseMessage: 'Unable to update basket',
+        body: { 
+          errors: [{ 
+            field: 'server', 
+            message: 'Internal server error' 
+          }] 
+        }
+      };
+
+      res.status(500).json(response);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/v1/customer/basket/article/{id}:
+ *   delete:
+ *     summary: Delete an article from a customer's basket
+ *     tags: [Customer]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Basket Article ID
+ *     responses:
+ *       200:
+ *         description: Article removed from basket successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 200
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Article removed from basket successfully
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     deletedArticleId:
+ *                       type: string
+ *                       description: ID of the deleted basket article
+ *       400:
+ *         description: Validation error or basket is billed/discarded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 400
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Cannot remove article from billed basket
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       404:
+ *         description: Article not found in basket
+ *       500:
+ *         description: Internal server error
+ */
+router.delete('/basket/article/:id',
+  authenticateToken,
+  [
+    param('id').isUUID().withMessage('Article ID must be a valid UUID')
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      // Check for validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Validation failed',
+          body: {
+            errors: errors.array().map(error => ({
+              field: error.type === 'field' ? error.path : 'body',
+              message: error.msg
+            }))
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      const articleId = req.params.id as string;
+
+      // Find the basket article
+      const basketArticle = await prisma.customerBasketArticles.findUnique({
+        where: { id: articleId },
+        include: {
+          basket: {
+            select: {
+              id: true,
+              isBilled: true,
+              isDiscarded: true
+            }
+          }
+        }
+      });
+
+      if (!basketArticle) {
+        const response: ApiResponse = {
+          responseCode: 404,
+          responseMessage: 'Article not found in basket',
+          body: {
+            errors: [{
+              field: 'id',
+              message: 'Basket article with the provided ID does not exist'
+            }]
+          }
+        };
+        res.status(404).json(response);
+        return;
+      }
+
+      // Check if basket is billed or discarded
+      if (basketArticle.basket.isBilled) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Cannot remove article from billed basket',
+          body: {
+            errors: [{
+              field: 'basket',
+              message: 'Cannot remove articles from a basket that has already been billed'
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      if (basketArticle.basket.isDiscarded) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Cannot remove article from discarded basket',
+          body: {
+            errors: [{
+              field: 'basket',
+              message: 'Cannot remove articles from a discarded basket'
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Delete the basket article
+      await prisma.customerBasketArticles.delete({
+        where: { id: articleId }
+      });
+
+      const response: ApiResponse = {
+        responseCode: 200,
+        responseMessage: 'Article removed from basket successfully',
+        body: {
+          deletedArticleId: articleId
+        }
+      };
+
+      res.status(200).json(response);
+
+    } catch (error) {
+      console.error('Article deletion error:', error);
+      
+      const response: ApiResponse = {
+        responseCode: 500,
+        responseMessage: 'Unable to remove article from basket',
+        body: { 
+          errors: [{ 
+            field: 'server', 
+            message: 'Internal server error' 
+          }] 
+        }
+      };
+
+      res.status(500).json(response);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/v1/customer/basket/article/{id}:
+ *   patch:
+ *     summary: Update details of an article in a customer's basket
+ *     tags: [Customer]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Basket Article ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               netWeight:
+ *                 type: number
+ *                 format: float
+ *                 description: Net weight of the article
+ *                 example: 25.50
+ *               grossWeight:
+ *                 type: number
+ *                 format: float
+ *                 description: Gross weight of the article
+ *                 example: 26.20
+ *               addOnCost:
+ *                 type: number
+ *                 format: float
+ *                 description: Additional cost
+ *                 example: 1000
+ *               wastage:
+ *                 type: number
+ *                 format: float
+ *                 description: Wastage amount
+ *                 example: 0.5
+ *               makingCharge:
+ *                 type: number
+ *                 format: float
+ *                 description: Making charge
+ *                 example: 2000
+ *               discount:
+ *                 type: number
+ *                 format: float
+ *                 description: Discount amount
+ *                 example: 500
+ *     responses:
+ *       200:
+ *         description: Article updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 200
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Article updated successfully
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     basketArticle:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         basketId:
+ *                           type: string
+ *                         articleId:
+ *                           type: string
+ *                         netWeight:
+ *                           type: number
+ *                         grossWeight:
+ *                           type: number
+ *                         addOnCost:
+ *                           type: number
+ *                         wastage:
+ *                           type: number
+ *                         makingCharge:
+ *                           type: number
+ *                         discount:
+ *                           type: number
+ *                         createdAt:
+ *                           type: string
+ *                           format: date-time
+ *                         updatedAt:
+ *                           type: string
+ *                           format: date-time
+ *       400:
+ *         description: Validation error or basket is billed/discarded
+ *       404:
+ *         description: Article not found in basket
+ *       500:
+ *         description: Internal server error
+ */
+router.patch('/basket/article/:id',
+  authenticateToken,
+  [
+    param('id').isUUID().withMessage('Article ID must be a valid UUID'),
+    body('netWeight').optional().isFloat({ min: 0.01 }).withMessage('Net weight must be a positive number greater than 0'),
+    body('grossWeight').optional().isFloat({ min: 0.01, max: 1000 }).withMessage('Gross weight must be a positive number and cannot exceed 1000'),
+    body('addOnCost').optional().isFloat({ min: 0.01 }).withMessage('Add-on cost must be a positive number'),
+    body('wastage').optional().isFloat({ min: 0.01 }).withMessage('Wastage must be a positive number'),
+    body('makingCharge').optional().isFloat({ min: 0, max: 9999.99 }).withMessage('Making charge must be >= 0 and < 10000'),
+    body('discount').optional().isFloat({ min: 0, max: 9999.99 }).withMessage('Discount must be >= 0 and < 10000')
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      // Check for validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Validation failed',
+          body: {
+            errors: errors.array().map(error => ({
+              field: error.type === 'field' ? error.path : 'body',
+              message: error.msg
+            }))
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      const articleId = req.params.id as string;
+      const { netWeight, grossWeight, addOnCost, wastage, makingCharge, discount } = req.body;
+
+      // Find the basket article with basket information
+      const basketArticle = await prisma.customerBasketArticles.findUnique({
+        where: { id: articleId },
+        include: {
+          basket: {
+            select: {
+              id: true,
+              isBilled: true,
+              isDiscarded: true
+            }
+          }
+        }
+      });
+
+      if (!basketArticle) {
+        const response: ApiResponse = {
+          responseCode: 404,
+          responseMessage: 'Article not found in basket',
+          body: {
+            errors: [{
+              field: 'id',
+              message: 'Basket article with the provided ID does not exist'
+            }]
+          }
+        };
+        res.status(404).json(response);
+        return;
+      }
+
+      // Check if basket is open (both isBilled and isDiscarded must be false)
+      if (basketArticle.basket.isBilled) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Cannot update article in billed basket',
+          body: {
+            errors: [{
+              field: 'basket',
+              message: 'Cannot update articles in a basket that has already been billed'
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      if (basketArticle.basket.isDiscarded) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Cannot update article in discarded basket',
+          body: {
+            errors: [{
+              field: 'basket',
+              message: 'Cannot update articles in a discarded basket'
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Prepare update data with only provided fields
+      const updateData: any = {};
+      const validationErrors: Array<{field: string, message: string}> = [];
+      
+      // Determine effective weights for validation
+      const effectiveNetWeight = netWeight !== undefined ? parseFloat(netWeight) : basketArticle.netWeight;
+      const effectiveGrossWeight = grossWeight !== undefined ? parseFloat(grossWeight) : basketArticle.grossWeight;
+
+      // Custom validations
+      if (netWeight !== undefined) {
+        const parsedNetWeight = parseFloat(netWeight);
+        updateData.netWeight = parsedNetWeight;
+        
+        // Check if netWeight > grossWeight (either new grossWeight or existing)
+        if (parsedNetWeight > effectiveGrossWeight) {
+          validationErrors.push({
+            field: 'netWeight',
+            message: `Net weight (${parsedNetWeight}) cannot be greater than gross weight (${effectiveGrossWeight})`
+          });
+        }
+      }
+
+      if (grossWeight !== undefined) {
+        const parsedGrossWeight = parseFloat(grossWeight);
+        updateData.grossWeight = parsedGrossWeight;
+        
+        // Check if existing or new netWeight > new grossWeight
+        if (effectiveNetWeight > parsedGrossWeight) {
+          validationErrors.push({
+            field: 'grossWeight',
+            message: `Gross weight (${parsedGrossWeight}) cannot be less than net weight (${effectiveNetWeight})`
+          });
+        }
+      }
+
+      if (addOnCost !== undefined) {
+        updateData.addOnCost = parseFloat(addOnCost);
+      }
+
+      if (wastage !== undefined) {
+        const parsedWastage = parseFloat(wastage);
+        updateData.wastage = parsedWastage;
+        
+        // Check if wastage > 20% of netWeight
+        const maxWastage = effectiveNetWeight * 0.2;
+        if (parsedWastage > maxWastage) {
+          validationErrors.push({
+            field: 'wastage',
+            message: `Wastage (${parsedWastage}) cannot be greater than 20% of net weight (${maxWastage.toFixed(2)})`
+          });
+        }
+      }
+
+      if (makingCharge !== undefined) {
+        updateData.makingCharge = parseFloat(makingCharge);
+      }
+
+      if (discount !== undefined) {
+        updateData.discount = parseFloat(discount);
+      }
+
+      // Check if at least one field is provided for update
+      if (Object.keys(updateData).length === 0) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'No valid fields provided for update',
+          body: {
+            errors: [{
+              field: 'body',
+              message: 'At least one valid field must be provided for update'
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Return validation errors if any
+      if (validationErrors.length > 0) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Validation failed',
+          body: {
+            errors: validationErrors
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Update the basket article
+      const updatedBasketArticle = await prisma.customerBasketArticles.update({
+        where: { id: articleId },
+        data: updateData
+      });
+
+      const response: ApiResponse = {
+        responseCode: 200,
+        responseMessage: 'Article updated successfully',
+        body: {
+          basketArticle: {
+            id: updatedBasketArticle.id,
+            basketId: updatedBasketArticle.basketId,
+            articleId: updatedBasketArticle.articleId,
+            netWeight: updatedBasketArticle.netWeight,
+            grossWeight: updatedBasketArticle.grossWeight,
+            addOnCost: updatedBasketArticle.addOnCost,
+            wastage: updatedBasketArticle.wastage,
+            makingCharge: updatedBasketArticle.makingCharge,
+            discount: updatedBasketArticle.discount,
+            createdAt: updatedBasketArticle.createdAt,
+            updatedAt: updatedBasketArticle.updatedAt
+          }
+        }
+      };
+
+      res.status(200).json(response);
+
+    } catch (error) {
+      console.error('Article update error:', error);
+      
+      const response: ApiResponse = {
+        responseCode: 500,
+        responseMessage: 'Unable to update article in basket',
         body: { 
           errors: [{ 
             field: 'server', 
