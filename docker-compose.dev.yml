@@ -40,13 +40,15 @@ services:
       dockerfile: Dockerfile.dev
     image: goldscanner-api:dev
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://goldscanner_user:goldscanner_password@postgres:5432/goldscanner_db
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: dev_jwt_secret
-      LOG_LEVEL: debug
+      NODE_ENV: ${NODE_ENV}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      LOG_LEVEL: ${LOG_LEVEL}
+      GOLD_RATE_API_URL: ${GOLD_RATE_API_URL}
     depends_on:
       postgres:
         condition: service_healthy

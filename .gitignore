@@ -43,12 +43,14 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# Environment variables
+# Environment files (actual)
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.dev  
+.env.prod
+
+# But keep templates
+!.env*.example
 
 # Build output
 dist/
