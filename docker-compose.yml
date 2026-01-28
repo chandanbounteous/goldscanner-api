@@ -42,6 +42,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: goldscanner-api:latest
     ports:
       - "3000:3000"
     environment:
@@ -60,6 +61,24 @@ services:
       - /app/node_modules
     networks:
       - goldscanner_network
+    # Override the CMD from Dockerfile - this bypasses the file issue
+    command: >
+      sh -c "
+        echo '=== GoldScanner API Startup ===' &&
+        echo 'Running database migrations...' &&
+        npx prisma migrate deploy &&
+        if [ $$? -eq 0 ]; then
+          echo '✅ Migrations applied successfully!' &&
+          echo 'Running database seeding...' &&
+          npm run db:seed &&
+          echo '✅ Seeding completed!'
+        else
+          echo '❌ Migration failed!' &&
+          exit 1
+        fi &&
+        echo 'Starting application...' &&
+        exec node dist/index.js
+      "
     restart: unless-stopped
     develop:
       watch:

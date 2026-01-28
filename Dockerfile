@@ -1,38 +1,56 @@
-# Use the official Node.js 20 LTS image with Alpine Linux for a lightweight container
-FROM node:20-alpine
+FROM node:20-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies for building native modules if needed
-RUN apk add --no-cache python3 make g++
-
-# Copy package files first to leverage Docker cache
+# Copy package files
 COPY package*.json ./
+COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies for build
+RUN npm ci --legacy-peer-deps
 
-# Copy TypeScript config and source code
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy source code
 COPY . .
 
-# Build the TypeScript application
+# Build application
 RUN npm run build
 
-# Create a non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+# Production stage
+FROM node:20-alpine AS production
 
-# Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
-USER nodejs
+# Install curl for health checks
+RUN apk add --no-cache curl
 
-# Expose the port the app runs on
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S goldscanner -u 1001
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install production dependencies only
+RUN npm ci --only=production --legacy-peer-deps
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy built application from builder stage
+COPY --from=builder --chown=goldscanner:nodejs /app/dist ./dist
+
+# Create logs directory with proper permissions
+RUN mkdir -p logs && chown -R goldscanner:nodejs logs
+
+# Switch to non-root user
+USER goldscanner
+
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
-# Start the application
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]

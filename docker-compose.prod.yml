@@ -5,29 +5,27 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_HOST_AUTH_METHOD: md5
-      POSTGRES_DB: goldscanner_db
-      POSTGRES_USER: goldscanner_user
-      POSTGRES_PASSWORD: goldscanner_password
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-goldscanner_db}
+      POSTGRES_USER: ${POSTGRES_USER:-goldscanner_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - postgres_data_dev:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - goldscanner_network
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U goldscanner_user -d goldscanner_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-goldscanner_user} -d ${POSTGRES_DB:-goldscanner_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
-      - redis_data_dev:/data
+      - redis_data:/data
     networks:
       - goldscanner_network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -35,18 +33,15 @@ services:
       retries: 3
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    image: goldscanner-api:dev
+    image: ${DOCKER_USERNAME}/goldscanner-api:${VERSION:-latest}
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://goldscanner_user:goldscanner_password@postgres:5432/goldscanner_db
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-goldscanner_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-goldscanner_db}
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: dev_jwt_secret
-      LOG_LEVEL: debug
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,20 +49,18 @@ services:
         condition: service_healthy
     networks:
       - goldscanner_network
+    restart: unless-stopped
     command: >
       sh -c "
-        echo '=== GoldScanner API Development Testing ===' &&
-        echo 'Running database migrations...' &&
+        echo '=== GoldScanner API Production Startup ===' &&
         npx prisma migrate deploy &&
-        echo 'Running database seeding...' &&
         npm run db:seed &&
-        echo 'Starting application...' &&
         exec node dist/index.js
       "
 
 volumes:
-  postgres_data_dev:
-  redis_data_dev:
+  postgres_data:
+  redis_data:
 
 networks:
   goldscanner_network:

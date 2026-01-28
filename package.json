@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node scripts/build-seeds.js",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
@@ -19,11 +19,15 @@
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
     "db:studio": "npx prisma studio",
-    "db:seed": "tsx src/scripts/seed.ts",
+    "db:seed": "node dist/scripts/seed.js",
+    "db:seed:dev": "tsx src/scripts/seed.ts",
     "docker:build": "docker build -t goldscanner-api .",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f api"
+    "docker:logs": "docker-compose logs -f api",
+    "local:up": "docker-compose -f docker-compose.local.yml up -d",
+    "local:down": "docker-compose -f docker-compose.local.yml down",
+    "local:setup": "npm run local:up && npm run migrate && npm run db:seed"
   },
   "keywords": [
     "nodejs",
@@ -37,9 +41,9 @@
   "license": "MIT",
   "dependencies": {
     "@prisma/client": "^6.19.2",
-    "@types/jsdom": "^27.0.0",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
+    "cheerio": "^1.0.0-rc.12",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -47,7 +51,6 @@
     "express-rate-limit": "^8.2.1",
     "express-validator": "^7.3.1",
     "helmet": "^8.1.0",
-    "jsdom": "^27.4.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
@@ -62,6 +65,7 @@
   "devDependencies": {
     "@types/axios": "^0.9.36",
     "@types/bcryptjs": "^3.0.0",
+    "@types/cheerio": "^0.22.35",
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

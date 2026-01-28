@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { JSDOM } from 'jsdom';
+import * as cheerio from 'cheerio';
 import { redisClient } from '../index';
 import { RateAtDate, RateAtDateWithCache } from '../types/gold';
 import { NepaliDateHelper, NepaliDateObject } from '../utils/nepaliDateHelper';
@@ -21,8 +21,8 @@ export class GoldRateFetcher {
       logger.info(`Cache Key: ${cacheKey}`);
 
       // Try to get from Redis cache first
-        const cachedRate = await this.getCachedRate(cacheKey);
-        logger.info(`Cached Rate: ${JSON.stringify(cachedRate)}`);
+      const cachedRate = await this.getCachedRate(cacheKey);
+      logger.info(`Cached Rate: ${JSON.stringify(cachedRate)}`);
       
       if (cachedRate && NepaliDateHelper.datesAreEqual(cachedRate.date, currentNepaliDate)) {
         logger.info('Gold rate retrieved from cache');
@@ -57,8 +57,8 @@ export class GoldRateFetcher {
    */
   private static async getCachedRate(cacheKey: string): Promise<RateAtDate | null> {
     try {
-        const cached = await redisClient.get(cacheKey);
-        logger.info(`Cached data for key ${cacheKey}: ${cached}`);
+      const cached = await redisClient.get(cacheKey);
+      logger.info(`Cached data for key ${cacheKey}: ${cached}`);
       if (cached) {
         return JSON.parse(cached) as RateAtDate;
       }
@@ -80,8 +80,8 @@ export class GoldRateFetcher {
         return null;
       }
 
-        const rateAtDate = this.extractFineGoldPerTola(html);
-        logger.info(`Extracted Rate At Date: ${JSON.stringify(rateAtDate)}`);
+      const rateAtDate = this.extractFineGoldPerTola(html);
+      logger.info(`Extracted Rate At Date: ${JSON.stringify(rateAtDate)}`);
       if (!rateAtDate) {
         logger.error('Failed to extract gold rate from HTML');
         return null;
@@ -135,22 +135,23 @@ export class GoldRateFetcher {
   }
 
   /**
-   * Extract fine gold rate per tola from HTML content
+   * Extract fine gold rate per tola from HTML content using cheerio
    */
   private static extractFineGoldPerTola(html: string): RateAtDate | null {
     try {
-      const dom = new JSDOM(html);
-      const document = dom.window.document;
+      const $ = cheerio.load(html);
 
       // Look for paragraphs containing "FINE GOLD (9999)" and "PER 1 TOLA"
-      const paragraphs = Array.from(document.querySelectorAll('p'));
+      const paragraphs = $('p');
       
-      for (const p of paragraphs) {
-        const text = p.textContent?.toUpperCase() || '';
+      for (let i = 0; i < paragraphs.length; i++) {
+        const $p = $(paragraphs[i]);
+        const text = $p.text().toUpperCase();
+        
         if (text.includes('FINE GOLD (9999)') && text.includes('PER 1 TOLA')) {
-          const rate = this.parseBoldNumber(p);
+          const rate = this.parseBoldNumber($p);
           if (rate !== null) {
-            const rateDate = this.extractRateDate(document);
+            const rateDate = this.extractRateDate($);
             if (rateDate) {
               return {
                 rate: rate,
@@ -162,20 +163,20 @@ export class GoldRateFetcher {
       }
 
       // Alternative approach - look for elements containing "FINE GOLD (9999)"
-      const allElements = Array.from(document.querySelectorAll('*'));
-      const labelElements = allElements.filter(el => 
-        el.textContent?.toUpperCase().includes('FINE GOLD (9999)')
-      );
+      const allElements = $('*').filter((i, el) => {
+        return $(el).text().toUpperCase().includes('FINE GOLD (9999)');
+      });
 
-      for (const el of labelElements) {
-        const nearby = this.getNearbyElements(el as Element);
+      for (let i = 0; i < allElements.length; i++) {
+        const $el = $(allElements[i]);
+        const nearby = this.getNearbyElements($, $el);
         
-        for (const candidate of nearby) {
-          const text = candidate.textContent?.toUpperCase() || '';
+        for (const $candidate of nearby) {
+          const text = $candidate.text().toUpperCase();
           if (text.includes('PER 1 TOLA')) {
-            const rate = this.parseBoldNumber(candidate);
+            const rate = this.parseBoldNumber($candidate);
             if (rate !== null) {
-              const rateDate = this.extractRateDate(document);
+              const rateDate = this.extractRateDate($);
               if (rateDate) {
                 return {
                   rate: rate,
@@ -195,34 +196,37 @@ export class GoldRateFetcher {
   }
 
   /**
-   * Get nearby elements for searching
+   * Get nearby elements for searching using cheerio
    */
-  private static getNearbyElements(element: Element): Element[] {
-    const nearby: Element[] = [];
+  private static getNearbyElements($: cheerio.CheerioAPI, $element: cheerio.Cheerio<any>): cheerio.Cheerio<any>[] {
+    const nearby: cheerio.Cheerio<any>[] = [];
     
     // Get next siblings
-    let nextSibling = element.nextElementSibling;
-    for (let i = 0; i < 5 && nextSibling; i++) {
-      nearby.push(nextSibling);
-      nextSibling = nextSibling.nextElementSibling;
+    let $nextSibling = $element.next();
+    for (let i = 0; i < 5 && $nextSibling.length > 0; i++) {
+      nearby.push($nextSibling);
+      $nextSibling = $nextSibling.next();
     }
 
     // Get parent's children
-    if (element.parentElement) {
-      nearby.push(...Array.from(element.parentElement.children));
+    const $parent = $element.parent();
+    if ($parent.length > 0) {
+      $parent.children().each((i, el) => {
+        nearby.push($(el));
+      });
     }
 
     return nearby;
   }
 
   /**
-   * Parse bold number from element
+   * Parse bold number from element using cheerio
    */
-  private static parseBoldNumber(element: Element): number | null {
-    const boldElements = element.querySelectorAll('b');
+  private static parseBoldNumber($element: cheerio.Cheerio<any>): number | null {
+    const $boldElements = $element.find('b');
     
-    for (const bold of boldElements) {
-      const text = bold.textContent?.trim() || '';
+    for (let i = 0; i < $boldElements.length; i++) {
+      const text = $boldElements.eq(i).text().trim();
       const normalized = text
         .replace(/,/g, '')
         .replace(/[^0-9.]/g, '');
@@ -230,7 +234,7 @@ export class GoldRateFetcher {
       if (normalized) {
         const number = parseFloat(normalized);
         if (!isNaN(number)) {
-          return Math.round(number); // Convert to integer as in Kotlin code
+          return Math.round(number); // Convert to integer as in original code
         }
       }
     }
@@ -239,18 +243,18 @@ export class GoldRateFetcher {
   }
 
   /**
-   * Extract rate date from document
+   * Extract rate date from document using cheerio
    */
-  private static extractRateDate(document: Document): NepaliDateObject | null {
+  private static extractRateDate($: cheerio.CheerioAPI): NepaliDateObject | null {
     try {
-      const dayElement = document.querySelector('div.rate-date-day');
-      const monthElement = document.querySelector('div.rate-date-month');
-      const yearElement = document.querySelector('div.rate-date-year');
+      const $dayElement = $('div.rate-date-day');
+      const $monthElement = $('div.rate-date-month');
+      const $yearElement = $('div.rate-date-year');
 
-      if (dayElement && monthElement && yearElement) {
-        const day = parseInt(dayElement.textContent?.trim() || '0');
-        const month = monthElement.textContent?.trim() || '';
-        const year = parseInt(yearElement.textContent?.trim() || '0');
+      if ($dayElement.length > 0 && $monthElement.length > 0 && $yearElement.length > 0) {
+        const day = parseInt($dayElement.text().trim() || '0');
+        const month = $monthElement.text().trim() || '';
+        const year = parseInt($yearElement.text().trim() || '0');
 
         if (day > 0 && year > 0 && month) {
           return NepaliDateHelper.getRateDate(day, month, year);
