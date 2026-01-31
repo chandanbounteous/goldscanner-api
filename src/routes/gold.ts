@@ -395,6 +395,8 @@ router.post('/calculate', authenticateToken, async (req: Request, res: Response)
  *                             type: number
  *                           stoneWeight:
  *                             type: number
+ *                           addOnCost:
+ *                             type: number
  *                           karat:
  *                             type: integer
  *                           carigar:
@@ -647,6 +649,11 @@ router.get('/articles',
  *                 format: float
  *                 description: Stone weight (optional, defaults to 0)
  *                 example: 0.70
+ *               addOnCost:
+ *                 type: number
+ *                 format: float
+ *                 description: Additional cost (optional, defaults to 0)
+ *                 example: 500
  *               karat:
  *                 type: integer
  *                 description: Gold purity (24, 22, 18, 14)
@@ -695,6 +702,8 @@ router.get('/articles',
  *                         grossWeight:
  *                           type: number
  *                         stoneWeight:
+ *                           type: number
+ *                         addOnCost:
  *                           type: number
  *                         karat:
  *                           type: integer
@@ -791,6 +800,7 @@ router.post('/article',
     body('netWeight').isFloat({ min: 0 }).withMessage('Net weight must be a positive number'),
     body('grossWeight').isFloat({ min: 0 }).withMessage('Gross weight must be a positive number'),
     body('stoneWeight').optional().isFloat({ min: 0 }).withMessage('Stone weight must be a positive number'),
+    body('addOnCost').optional().isFloat({ min: 0 }).withMessage('Add-on cost must be a positive number'),
     body('karat').isInt({ min: 1 }).isIn([24, 22, 18, 14]).withMessage('Karat must be one of: 24, 22, 18, 14')
   ],
   async (req: Request, res: Response) => {
@@ -819,6 +829,7 @@ router.post('/article',
         netWeight, 
         grossWeight, 
         stoneWeight = 0, 
+        addOnCost = 0, 
         karat 
       } = req.body;
 
@@ -880,6 +891,7 @@ router.post('/article',
           netWeight: parseFloat(netWeight),
           grossWeight: parseFloat(grossWeight),
           stoneWeight: parseFloat(stoneWeight),
+          addOnCost: parseFloat(addOnCost),
           karat: parseInt(karat)
         }
       });

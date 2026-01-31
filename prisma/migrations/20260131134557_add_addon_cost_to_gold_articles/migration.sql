@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "gold_articles" ADD COLUMN     "addOnCost" DOUBLE PRECISION NOT NULL DEFAULT 0;
