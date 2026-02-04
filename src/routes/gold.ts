@@ -858,8 +858,8 @@ router.post('/article',
         return;
       }
 
-      // Find carigar by codeName or use default UNKNOWN carigar
-      let carigarId = "2861c740-6155-408d-8cd1-4b63216c6ac8"; // Default UNKNOWN carigar ID
+      // Find carigar by codeName or set to null if not provided
+      let carigarId: string | null = null;
       
       if (carigarNameCode && carigarNameCode.trim()) {
         const foundCarigar = await prisma.carigar.findFirst({

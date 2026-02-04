@@ -40,7 +40,7 @@ model GoldArticle {
   serialNumber    BigInt
   issueDate       DateTime
   issueDateNepali Json
-  carigarId       String
+  carigarId       String?
   netWeight       Float
   grossWeight     Float
   stoneWeight     Float
@@ -49,7 +49,7 @@ model GoldArticle {
   karat           Int                      @default(24)
   addOnCost       Float                    @default(0)
   basketArticles  CustomerBasketArticles[]
-  carigar         Carigar                  @relation(fields: [carigarId], references: [id])
+  carigar         Carigar?                 @relation(fields: [carigarId], references: [id])
 
   @@map("gold_articles")
 }

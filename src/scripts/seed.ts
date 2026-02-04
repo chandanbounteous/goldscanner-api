@@ -23,7 +23,8 @@ const carigarList = [
   'SUBENDU',
   'SUBENDU KR',
   'SUKUMAR-KR',
-  'SUMAN KR'
+  'SUMAN KR',
+  'UNKNOWN'
 ];
 
 // Sample Articles CSV data (updated with 4-digit years)
