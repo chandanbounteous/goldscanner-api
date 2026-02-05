@@ -5,7 +5,7 @@ import { NepaliDateHelper } from '../utils/nepaliDateHelper';
 import { ApiResponse, GoldRateResponse } from '../types/gold';
 import { authenticateToken } from '../middleware/auth';
 import { PrismaClient } from '@prisma/client';
-import { query, body, validationResult } from 'express-validator';
+import { query, body, param, validationResult } from 'express-validator';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -918,6 +918,256 @@ router.post('/article',
       const response: ApiResponse = {
         responseCode: 500,
         responseMessage: 'Unable to create gold article',
+        body: { 
+          errors: [{ 
+            field: 'server', 
+            message: 'Internal server error' 
+          }] 
+        }
+      };
+
+      res.status(500).json(response);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/v1/gold/article/{articleId}:
+ *   patch:
+ *     summary: Update a gold article by ID
+ *     tags: [Gold]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: articleId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The article ID
+ *     requestBody:
+ *       description: Article update data
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               serialNumber:
+ *                 type: string
+ *                 description: Serial number of the article
+ *               carigarNameCode:
+ *                 type: string
+ *                 description: Carigar name code
+ *               netWeight:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: Net weight of the article
+ *               grossWeight:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: Gross weight of the article
+ *               stoneWeight:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: Stone weight of the article
+ *               addOnCost:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: Additional cost for the article
+ *               karat:
+ *                 type: integer
+ *                 enum: [24, 22, 18, 14]
+ *                 description: Karat of the gold
+ *     responses:
+ *       200:
+ *         description: Article updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responseCode:
+ *                   type: number
+ *                   example: 200
+ *                 responseMessage:
+ *                   type: string
+ *                   example: Article updated successfully
+ *                 body:
+ *                   type: object
+ *                   properties:
+ *                     article:
+ *                       type: object
+ *       400:
+ *         description: Validation failed or bad request
+ *       401:
+ *         description: Unauthorized - Invalid or missing access token
+ *       404:
+ *         description: Article not found
+ *       500:
+ *         description: Internal server error
+ */
+router.patch('/article/:articleId',
+  authenticateToken,
+  [
+    body('serialNumber').optional().isString().trim().withMessage('Serial number must be a string'),
+    body('carigarNameCode').optional().isString().trim().withMessage('Carigar name code must be a string'),
+    body('netWeight').optional().isFloat({ min: 0 }).withMessage('Net weight must be a positive number'),
+    body('grossWeight').optional().isFloat({ min: 0 }).withMessage('Gross weight must be a positive number'),
+    body('stoneWeight').optional().isFloat({ min: 0 }).withMessage('Stone weight must be a positive number'),
+    body('addOnCost').optional().isFloat({ min: 0 }).withMessage('Add-on cost must be a positive number'),
+    body('karat').optional().isInt({ min: 1 }).isIn([24, 22, 18, 14]).withMessage('Karat must be one of: 24, 22, 18, 14')
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      // Check for validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Validation failed',
+          body: {
+            errors: errors.array().map(error => ({
+              field: error.type === 'field' ? error.path : 'body',
+              message: error.msg
+            }))
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      const articleId = req.params.articleId as string;
+      const { 
+        serialNumber, 
+        carigarNameCode, 
+        netWeight, 
+        grossWeight, 
+        stoneWeight, 
+        addOnCost, 
+        karat 
+      } = req.body;
+
+      // Validate that articleId is a valid UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(articleId)) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'Invalid article ID format',
+          body: {
+            errors: [{
+              field: 'articleId',
+              message: 'Article ID must be a valid UUID'
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Check if at least one field is provided for update
+      const updateFields = { serialNumber, carigarNameCode, netWeight, grossWeight, stoneWeight, addOnCost, karat };
+      const providedFields = Object.entries(updateFields).filter(([_, value]) => value !== undefined);
+      
+      if (providedFields.length === 0) {
+        const response: ApiResponse = {
+          responseCode: 400,
+          responseMessage: 'No valid fields provided for update',
+          body: {
+            errors: [{
+              field: 'body',
+              message: 'At least one valid field must be provided for update'
+            }]
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Check if article exists
+      const existingArticle = await prisma.goldArticle.findUnique({
+        where: { id: articleId }
+      });
+
+      if (!existingArticle) {
+        const response: ApiResponse = {
+          responseCode: 404,
+          responseMessage: 'Article not found',
+          body: {
+            errors: [{
+              field: 'articleId',
+              message: 'Article with the provided ID does not exist'
+            }]
+          }
+        };
+        res.status(404).json(response);
+        return;
+      }
+
+      // Find carigar by codeName if carigarNameCode is provided
+      let carigarId: string | null = existingArticle.carigarId;
+      
+      if (carigarNameCode !== undefined) {
+        if (carigarNameCode && carigarNameCode.trim()) {
+          const foundCarigar = await prisma.carigar.findFirst({
+            where: {
+              codeName: {
+                equals: carigarNameCode.trim(),
+                mode: 'insensitive'
+              }
+            }
+          });
+
+          if (foundCarigar) {
+            carigarId = foundCarigar.id;
+          } else {
+            carigarId = null; // Set to null if carigar not found
+          }
+        } else {
+          carigarId = null; // Set to null if empty string
+        }
+      }
+
+      // Prepare update data with only provided fields
+      const updateData: any = {};
+      
+      if (serialNumber !== undefined) updateData.serialNumber = serialNumber ? BigInt(serialNumber) : BigInt(0);
+      if (carigarNameCode !== undefined) updateData.carigarId = carigarId;
+      if (netWeight !== undefined) updateData.netWeight = parseFloat(netWeight);
+      if (grossWeight !== undefined) updateData.grossWeight = parseFloat(grossWeight);
+      if (stoneWeight !== undefined) updateData.stoneWeight = parseFloat(stoneWeight);
+      if (addOnCost !== undefined) updateData.addOnCost = parseFloat(addOnCost);
+      if (karat !== undefined) updateData.karat = parseInt(karat);
+
+      // Update the article
+      const updatedArticle = await prisma.goldArticle.update({
+        where: { id: articleId },
+        data: updateData
+      });
+
+      // Convert BigInt to string for JSON serialization
+      const serializedArticle = {
+        ...updatedArticle,
+        serialNumber: updatedArticle.serialNumber.toString()
+      };
+
+      const response: ApiResponse = {
+        responseCode: 200,
+        responseMessage: 'Article updated successfully',
+        body: {
+          article: serializedArticle
+        }
+      };
+
+      res.status(200).json(response);
+
+    } catch (error) {
+      console.error('Article update error:', error);
+      
+      const response: ApiResponse = {
+        responseCode: 500,
+        responseMessage: 'Unable to update article',
         body: { 
           errors: [{ 
             field: 'server', 
