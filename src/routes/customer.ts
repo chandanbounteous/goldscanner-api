@@ -2284,6 +2284,8 @@ router.patch('/basket/article/:id',
  *                           type: number
  *                         total:
  *                           type: number
+ *                         hasMore:
+ *                           type: boolean
  *       400:
  *         description: Validation error
  *       500:
@@ -2490,8 +2492,8 @@ router.post('/basket/search',
       if (includeDiscarded) {
         // If includeDiscarded is true, only include discarded records
         if (statusConditions.length > 0) {
-          // Combine with existing conditions using AND
-          const existingConditions = statusConditions;
+          // Create a copy of existing conditions to avoid circular reference
+          const existingConditions = [...statusConditions];
           statusConditions.length = 0; // Clear array
           statusConditions.push({
             AND: [
@@ -2505,8 +2507,8 @@ router.post('/basket/search',
       } else {
         // If includeDiscarded is false or not provided, only include non-discarded records
         if (statusConditions.length > 0) {
-          // Combine with existing conditions using AND
-          const existingConditions = statusConditions;
+          // Create a copy of existing conditions to avoid circular reference
+          const existingConditions = [...statusConditions];
           statusConditions.length = 0; // Clear array
           statusConditions.push({
             AND: [
@@ -2662,7 +2664,8 @@ router.post('/basket/search',
           pagination: {
             offset,
             limit,
-            total: totalCount
+            total: totalCount,
+            hasMore: offset + limit < totalCount
           }
         }
       };
