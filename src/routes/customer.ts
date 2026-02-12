@@ -1059,6 +1059,8 @@ router.post('/basket/:basketId/article',
  *                             type: string
  *                           articleId:
  *                             type: string
+ *                           articleCode:
+ *                             type: string
  *                           netWeight:
  *                             type: number
  *                           grossWeight:
@@ -1165,6 +1167,7 @@ router.get('/basket/:basketId',
             id,
             "basketId",
             "articleId",
+            "articleCode",
             "netWeight",
             "grossWeight",
             "addOnCost",
@@ -1180,6 +1183,7 @@ router.get('/basket/:basketId',
                 cba.id,
                 cba."basketId",
                 cba."articleId",
+                ga."articleCode",
                 cba."netWeight",
                 cba."grossWeight",
                 cba."addOnCost",
@@ -1289,6 +1293,7 @@ router.get('/basket/:basketId',
             id: article.id,
             basketId: article.basketId,
             articleId: article.articleId,
+            articleCode: article.articleCode,
             netWeight: parseFloat(article.netWeight),
             grossWeight: parseFloat(article.grossWeight),
             addOnCost: parseFloat(article.addOnCost),
