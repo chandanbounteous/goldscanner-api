@@ -1092,6 +1092,8 @@ router.post('/basket/:basketId/article',
  *                           type: number
  *                         postTaxBasketAmount:
  *                           type: number
+ *                         totalAddOnCost:
+ *                           type: number
  *                         totalBasketAmount:
  *                           type: number
  *       404:
@@ -1272,6 +1274,7 @@ router.get('/basket/:basketId',
           preTaxBasketAmount,
           luxuryTax,
           postTaxBasketAmount,
+          totalAddOnCost,
           totalBasketAmount
         };
       } else {
@@ -1280,6 +1283,7 @@ router.get('/basket/:basketId',
           preTaxBasketAmount: parseFloat(basketTotals.pre_tax_basket_amount || '0'),
           luxuryTax: parseFloat(basketTotals.taxed_basket_amount || '0'),
           postTaxBasketAmount: parseFloat(basketTotals.post_tax_basket_amount || '0'),
+          totalAddOnCost,
           totalBasketAmount: parseFloat(basketTotals.total_basket_amount || '0')
         };
       }
