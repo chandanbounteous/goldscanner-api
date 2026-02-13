@@ -34,20 +34,23 @@ async function testGoldCalculator() {
   console.log('Article cost calculation:');
   console.log(`Pre-tax cost: ${articleCost.preTaxArticleCost}`);
   console.log(`Luxury tax: ${articleCost.luxuryTaxAmount}`);
-  console.log(`Post-tax cost: ${articleCost.postTaxArticleCost}\n`);
+  console.log(`Post-tax cost: ${articleCost.postTaxArticleCost}`);
+  console.log(`Final cost: ${articleCost.finalCost}\n`);
 
   // Test 4: calcTotalBasketCost
   console.log('4. Testing calcTotalBasketCost:');
   const basketCost = GoldCalculator.calcTotalBasketCost(
     150000,    // totalArticlesCost
     20000,     // oldGoldItemsCost
-    5000       // extraDiscount
+    5000,      // extraDiscount
+    8000       // totalAddOnCost
   );
   
   console.log('Basket cost calculation:');
   console.log(`Pre-tax amount: ${basketCost.preTaxBasketAmount}`);
   console.log(`Tax amount: ${basketCost.taxedBasketAmount}`);
-  console.log(`Post-tax total: ${basketCost.postTaxBasketAmount}\n`);
+  console.log(`Post-tax total: ${basketCost.postTaxBasketAmount}`);
+  console.log(`Total basket amount: ${basketCost.totalBasketAmount}\n`);
 
   console.log('=== All tests completed ===');
 }

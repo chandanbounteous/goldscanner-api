@@ -25,7 +25,8 @@ SELECT
   'Single Article Cost' as calculation_type,
   pre_tax_article_cost,
   luxury_tax_amount,
-  post_tax_article_cost
+  post_tax_article_cost,
+  final_cost
 FROM calc_article_cost(
   100000::numeric,  -- gold rate 24K per tola
   22::integer,      -- article karat
@@ -41,11 +42,13 @@ SELECT
   'Basket Total' as calculation_type,
   pre_tax_basket_amount,
   taxed_basket_amount,
-  post_tax_basket_amount
+  post_tax_basket_amount,
+  total_basket_amount
 FROM calc_total_basket_cost(
   200000::numeric,  -- total articles cost
   30000::numeric,   -- old gold items cost
-  10000::numeric    -- extra discount
+  10000::numeric,   -- extra discount
+  15000::numeric    -- total add-on cost
 );
 
 -- 5. Complex example: Calculate costs for multiple articles in a basket
@@ -56,7 +59,8 @@ WITH article_calculations AS (
     article_weight,
     pre_tax_article_cost,
     luxury_tax_amount,
-    post_tax_article_cost
+    post_tax_article_cost,
+    final_cost
   FROM (
     VALUES 
       ('ART001', 22, 12.5, 100000),
@@ -75,20 +79,24 @@ WITH article_calculations AS (
 ),
 basket_summary AS (
   SELECT 
-    SUM(post_tax_article_cost) as total_articles_cost
+    SUM(post_tax_article_cost) as total_articles_cost,
+    SUM(1000) as total_add_on_cost  -- Each article has 1000 add-on cost
   FROM article_calculations
 )
 SELECT 
   'Multi-Article Basket' as calculation_type,
   (SELECT total_articles_cost FROM basket_summary) as total_articles_cost,
+  (SELECT total_add_on_cost FROM basket_summary) as total_add_on_cost,
   pre_tax_basket_amount,
   taxed_basket_amount,
-  post_tax_basket_amount
+  post_tax_basket_amount,
+  total_basket_amount
 FROM basket_summary,
 LATERAL calc_total_basket_cost(
   total_articles_cost::numeric,
   5000::numeric,   -- old gold value
-  2000::numeric    -- extra discount
+  2000::numeric,   -- extra discount
+  total_add_on_cost::numeric  -- total add-on cost
 );
 
 -- 6. View to get gold rates (can be used in applications)

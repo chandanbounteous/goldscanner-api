@@ -1081,6 +1081,8 @@ router.post('/basket/:basketId/article',
  *                             type: number
  *                           postTaxArticleCost:
  *                             type: number
+ *                           finalCost:
+ *                             type: number
  *                     totals:
  *                       type: object
  *                       properties:
@@ -1089,6 +1091,8 @@ router.post('/basket/:basketId/article',
  *                         luxuryTax:
  *                           type: number
  *                         postTaxBasketAmount:
+ *                           type: number
+ *                         totalBasketAmount:
  *                           type: number
  *       404:
  *         description: Basket not found
@@ -1177,7 +1181,8 @@ router.get('/basket/:basketId',
             karat,
             (article_cost).pre_tax_article_cost AS "preTaxArticleCost",
             (article_cost).luxury_tax_amount AS "luxuryTaxAmount",
-            (article_cost).post_tax_article_cost AS "postTaxArticleCost"
+            (article_cost).post_tax_article_cost AS "postTaxArticleCost",
+            (article_cost).final_cost AS "finalCost"
         FROM (
             SELECT 
                 cba.id,
@@ -1213,31 +1218,38 @@ router.get('/basket/:basketId',
         basketId
       );
 
-      // Step e: Sum up preTaxArticleCost
-      const totalPreTaxArticleCost = articles.reduce((sum, article) => {
-        return sum + parseFloat(article.preTaxArticleCost || '0');
-      }, 0);
+      // Step e: Calculate totals from articles
+      let totalPreTaxArticleCost = 0;
+      let totalAddOnCost = 0;
+      
+      articles.forEach(article => {
+        totalPreTaxArticleCost += parseFloat(article.preTaxArticleCost || '0');
+        totalAddOnCost += parseFloat(article.addOnCost || '0');
+      });
 
       // Step f: Calculate total basket cost
       const basketCostQuery = `
         SELECT 
             pre_tax_basket_amount,
             taxed_basket_amount,
-            post_tax_basket_amount
-        FROM calc_total_basket_cost($1, $2, $3);
+            post_tax_basket_amount,
+            total_basket_amount
+        FROM calc_total_basket_cost($1, $2, $3, $4);
       `;
 
       const basketCostResult: any[] = await prisma.$queryRawUnsafe(
         basketCostQuery,
         totalPreTaxArticleCost,
         basket.oldGoldItemCost,
-        basket.extraDiscount
+        basket.extraDiscount,
+        totalAddOnCost
       );
 
       const basketTotals = basketCostResult[0] || {
         pre_tax_basket_amount: 0,
         taxed_basket_amount: 0,
-        post_tax_basket_amount: 0
+        post_tax_basket_amount: 0,
+        total_basket_amount: 0
       };
 
       // Convert BigInt phone to string for JSON serialization
@@ -1254,18 +1266,21 @@ router.get('/basket/:basketId',
         const luxuryTax = basket.luxuryTax || 0;
         const postTaxBasketAmount = basket.finalCost || 0;
         const preTaxBasketAmount = postTaxBasketAmount - luxuryTax;
+        const totalBasketAmount = postTaxBasketAmount + totalAddOnCost;
         
         totals = {
           preTaxBasketAmount,
           luxuryTax,
-          postTaxBasketAmount
+          postTaxBasketAmount,
+          totalBasketAmount
         };
       } else {
         // For non-billed baskets, use calculated values
         totals = {
           preTaxBasketAmount: parseFloat(basketTotals.pre_tax_basket_amount || '0'),
           luxuryTax: parseFloat(basketTotals.taxed_basket_amount || '0'),
-          postTaxBasketAmount: parseFloat(basketTotals.post_tax_basket_amount || '0')
+          postTaxBasketAmount: parseFloat(basketTotals.post_tax_basket_amount || '0'),
+          totalBasketAmount: parseFloat(basketTotals.total_basket_amount || '0')
         };
       }
 
@@ -1303,7 +1318,8 @@ router.get('/basket/:basketId',
             karat: parseInt(article.karat),
             preTaxArticleCost: parseFloat(article.preTaxArticleCost || '0'),
             luxuryTaxAmount: parseFloat(article.luxuryTaxAmount || '0'),
-            postTaxArticleCost: parseFloat(article.postTaxArticleCost || '0')
+            postTaxArticleCost: parseFloat(article.postTaxArticleCost || '0'),
+            finalCost: parseFloat(article.finalCost || '0')
           })),
           totals
         }

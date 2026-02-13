@@ -80,26 +80,31 @@ export class GoldCalculator {
     preTaxArticleCost: number;
     luxuryTaxAmount: number;
     postTaxArticleCost: number;
+    finalCost: number;
   } {
     // 1. Get gold rate per karat per gram
     const goldRateAsPerKaratPerTola = this.getGoldRateAsPerKarat(goldRate24KPerTola, articleKarat);
     const goldRateAsPerKaratPerGram = Math.round((goldRateAsPerKaratPerTola / this.ONE_TOLA_IN_GMS) * 100) / 100;
 
-    // 2. Calculate pre-tax article cost
+    // 2. Calculate pre-tax article cost (excluding add_on_cost)
     const preTaxArticleCost = Math.round(
-      ((goldRateAsPerKaratPerGram * (articleNetWeight + wastage)) + addOnCost + makingCharge - discount) * 100
+      ((goldRateAsPerKaratPerGram * (articleNetWeight + wastage)) + makingCharge - discount) * 100
     ) / 100;
 
-    // 3. Calculate luxury tax
+    // 3. Calculate luxury tax (on pre_tax_cost only)
     const luxuryTaxAmount = this.calcLuxuryTax(preTaxArticleCost);
 
-    // 4. Calculate post-tax cost
+    // 4. Calculate post-tax cost (pre_tax + luxury_tax)
     const postTaxArticleCost = Math.round((preTaxArticleCost + luxuryTaxAmount) * 100) / 100;
+
+    // 5. Calculate final cost (post_tax + add_on_cost)
+    const finalCost = Math.round((postTaxArticleCost + addOnCost) * 100) / 100;
 
     return {
       preTaxArticleCost,
       luxuryTaxAmount,
-      postTaxArticleCost
+      postTaxArticleCost,
+      finalCost
     };
   }
 
@@ -108,16 +113,19 @@ export class GoldCalculator {
    * @param totalArticlesCost - Total cost of all articles
    * @param oldGoldItemsCost - Cost of old gold items
    * @param extraDiscount - Extra discount amount
-   * @returns Object containing pre-tax amount, tax amount, and post-tax total
+   * @param totalAddOnCost - Total add-on cost of all articles
+   * @returns Object containing pre-tax amount, tax amount, post-tax total, and total basket amount
    */
   static calcTotalBasketCost(
     totalArticlesCost: number,
     oldGoldItemsCost: number,
-    extraDiscount: number
+    extraDiscount: number,
+    totalAddOnCost: number
   ): {
     preTaxBasketAmount: number;
     taxedBasketAmount: number;
     postTaxBasketAmount: number;
+    totalBasketAmount: number;
   } {
     // 1. Calculate pre-tax basket amount
     const preTaxBasketAmount = Math.round((totalArticlesCost - (oldGoldItemsCost + extraDiscount)) * 100) / 100;
@@ -128,10 +136,14 @@ export class GoldCalculator {
     // 3. Calculate post-tax basket amount
     const postTaxBasketAmount = Math.round((preTaxBasketAmount + taxedBasketAmount) * 100) / 100;
 
+    // 4. Calculate total basket amount (post_tax + total_add_on_cost)
+    const totalBasketAmount = Math.round((postTaxBasketAmount + totalAddOnCost) * 100) / 100;
+
     return {
       preTaxBasketAmount,
       taxedBasketAmount,
-      postTaxBasketAmount
+      postTaxBasketAmount,
+      totalBasketAmount
     };
   }
 }
