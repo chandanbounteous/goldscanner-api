@@ -41,7 +41,6 @@ export class BasketService {
       fixedGoldRateNepaliDate?: any;
       oldGoldItemCost?: number;
       extraDiscount?: number;
-      luxuryTax?: number;
     } = {}
   ) {
     const basketNumber = await this.getNextBasketNumber();
@@ -132,10 +131,9 @@ export class BasketService {
   }
 
   /**
-   * Update basket final cost and billing information
+   * Update basket billing information
    * @param basketId - Basket ID
-   * @param finalCost - Final calculated cost
-   * @param luxuryTax - Luxury tax amount
+   * @param billedGoldRate24KPerTola - Gold rate used for billing
    * @param isBilled - Whether the basket is billed
    * @param billingDate - Billing date
    * @param billingDateNepali - Billing date in Nepali calendar
@@ -143,21 +141,24 @@ export class BasketService {
    */
   static async updateBasketBilling(
     basketId: string,
-    finalCost: number,
-    luxuryTax: number,
+    billedGoldRate24KPerTola?: number,
     isBilled: boolean = false,
     billingDate?: Date,
     billingDateNepali?: any
   ) {
+    const updateData: any = {
+      isBilled,
+      billingDate,
+      billingDateNepali
+    };
+
+    if (billedGoldRate24KPerTola !== undefined) {
+      updateData.billedGoldRate24KPerTola = billedGoldRate24KPerTola;
+    }
+
     return await prisma.customerBasket.update({
       where: { id: basketId },
-      data: {
-        finalCost,
-        luxuryTax,
-        isBilled,
-        billingDate,
-        billingDateNepali
-      },
+      data: updateData,
       include: {
         customer: true,
         articles: {

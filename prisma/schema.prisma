@@ -68,26 +68,25 @@ model Customer {
 }
 
 model CustomerBasket {
-  id                      String                   @id @default(uuid())
-  basketNumber            Int                      @unique
-  customerId              String
-  isGoldRateFixed         Boolean                  @default(false)
-  fixedGoldRate24KPerTola Float?
-  fixedGoldRateNepaliDate Json?
-  oldGoldItemCost         Float                    @default(0)
-  extraDiscount           Float                    @default(0)
-  luxuryTax               Float                    @default(0)
-  finalCost               Float?
-  isBilled                Boolean                  @default(false)
-  billingDate             DateTime?
-  billingDateNepali       Json?
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  discardedDate           DateTime?
-  discardedDateNepali     Json?
-  isDiscarded             Boolean                  @default(false)
-  articles                CustomerBasketArticles[]
-  customer                Customer                 @relation(fields: [customerId], references: [id])
+  id                        String                   @id @default(uuid())
+  basketNumber              Int                      @unique
+  customerId                String
+  isGoldRateFixed           Boolean                  @default(false)
+  fixedGoldRate24KPerTola   Float?
+  fixedGoldRateNepaliDate   Json?
+  oldGoldItemCost           Float                    @default(0)
+  extraDiscount             Float                    @default(0)
+  billedGoldRate24KPerTola  Float?
+  isBilled                  Boolean                  @default(false)
+  billingDate               DateTime?
+  billingDateNepali         Json?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  discardedDate             DateTime?
+  discardedDateNepali       Json?
+  isDiscarded               Boolean                  @default(false)
+  articles                  CustomerBasketArticles[]
+  customer                  Customer                 @relation(fields: [customerId], references: [id])
 
   @@map("customer_baskets")
 }

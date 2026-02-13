@@ -634,8 +634,7 @@ router.post('/:customerId/basket',
             fixedGoldRateNepaliDate: newBasket.fixedGoldRateNepaliDate,
             oldGoldItemCost: newBasket.oldGoldItemCost,
             extraDiscount: newBasket.extraDiscount,
-            luxuryTax: newBasket.luxuryTax,
-            finalCost: newBasket.finalCost,
+            billedGoldRate24KPerTola: newBasket.billedGoldRate24KPerTola,
             isBilled: newBasket.isBilled,
             isDiscarded: newBasket.isDiscarded,
             createdAt: newBasket.createdAt,
@@ -1263,19 +1262,15 @@ router.get('/basket/:basketId',
       // Step g: Handle different totals based on billing status
       let totals;
       
-      if (basket.isBilled) {
-        // For billed baskets, use actual values from database
-        const luxuryTax = basket.luxuryTax || 0;
-        const postTaxBasketAmount = basket.finalCost || 0;
-        const preTaxBasketAmount = postTaxBasketAmount - luxuryTax;
-        const totalBasketAmount = postTaxBasketAmount + totalAddOnCost;
-        
+      if (basket.isBilled && basket.billedGoldRate24KPerTola) {
+        // For billed baskets, use calculated values with the billed rate
+        // We'll calculate from the SQL functions using the billed rate
         totals = {
-          preTaxBasketAmount,
-          luxuryTax,
-          postTaxBasketAmount,
+          preTaxBasketAmount: parseFloat(basketTotals.pre_tax_basket_amount || '0'),
+          luxuryTax: parseFloat(basketTotals.taxed_basket_amount || '0'),
+          postTaxBasketAmount: parseFloat(basketTotals.post_tax_basket_amount || '0'),
           totalAddOnCost,
-          totalBasketAmount
+          totalBasketAmount: parseFloat(basketTotals.total_basket_amount || '0')
         };
       } else {
         // For non-billed baskets, use calculated values
@@ -1382,16 +1377,11 @@ router.get('/basket/:basketId',
  *                 format: float
  *                 description: Extra discount amount
  *                 example: 1000
- *               luxuryTax:
+ *               billedGoldRate24KPerTola:
  *                 type: number
  *                 format: float
- *                 description: Luxury tax amount
- *                 example: 2500
- *               finalCost:
- *                 type: number
- *                 format: float
- *                 description: Final cost of the basket
- *                 example: 55000
+ *                 description: Gold rate used for billing
+ *                 example: 95000
  *               isBilled:
  *                 type: boolean
  *                 description: Whether the basket is billed
@@ -1462,9 +1452,7 @@ router.get('/basket/:basketId',
  *                           type: number
  *                         extraDiscount:
  *                           type: number
- *                         luxuryTax:
- *                           type: number
- *                         finalCost:
+ *                         billedGoldRate24KPerTola:
  *                           type: number
  *                         isBilled:
  *                           type: boolean
@@ -1510,8 +1498,7 @@ router.patch('/basket/:basketId',
     param('basketId').isUUID().withMessage('Basket ID must be a valid UUID'),
     body('oldGoldItemCost').optional().isFloat({ min: 0 }).withMessage('Old gold item cost must be a positive number'),
     body('extraDiscount').optional().isFloat({ min: 0 }).withMessage('Extra discount must be a positive number'),
-    body('luxuryTax').optional().isFloat({ min: 0 }).withMessage('Luxury tax must be a positive number'),
-    body('finalCost').optional().isFloat({ min: 0 }).withMessage('Final cost must be a positive number'),
+    body('billedGoldRate24KPerTola').optional().isFloat({ min: 0 }).withMessage('Billed gold rate must be a positive number'),
     body('isBilled').optional().isBoolean().withMessage('isBilled must be a boolean'),
     body('billingDate').optional().isISO8601().withMessage('Billing date must be a valid ISO 8601 date'),
     body('billingDateNepali').optional().isObject().withMessage('Billing date Nepali must be an object'),
@@ -1548,8 +1535,7 @@ router.patch('/basket/:basketId',
       const {
         oldGoldItemCost,
         extraDiscount,
-        luxuryTax,
-        finalCost,
+        billedGoldRate24KPerTola,
         isBilled,
         billingDate,
         billingDateNepali,
@@ -1599,8 +1585,7 @@ router.patch('/basket/:basketId',
       
       if (oldGoldItemCost !== undefined) updateData.oldGoldItemCost = parseFloat(oldGoldItemCost);
       if (extraDiscount !== undefined) updateData.extraDiscount = parseFloat(extraDiscount);
-      if (luxuryTax !== undefined) updateData.luxuryTax = parseFloat(luxuryTax);
-      if (finalCost !== undefined) updateData.finalCost = parseFloat(finalCost);
+      if (billedGoldRate24KPerTola !== undefined) updateData.billedGoldRate24KPerTola = parseFloat(billedGoldRate24KPerTola);
       if (isBilled !== undefined) updateData.isBilled = isBilled;
       if (billingDate !== undefined) updateData.billingDate = new Date(billingDate);
       if (billingDateNepali !== undefined) updateData.billingDateNepali = billingDateNepali;
@@ -1643,8 +1628,7 @@ router.patch('/basket/:basketId',
             fixedGoldRateNepaliDate: updatedBasket.fixedGoldRateNepaliDate,
             oldGoldItemCost: updatedBasket.oldGoldItemCost,
             extraDiscount: updatedBasket.extraDiscount,
-            luxuryTax: updatedBasket.luxuryTax,
-            finalCost: updatedBasket.finalCost,
+            billedGoldRate24KPerTola: updatedBasket.billedGoldRate24KPerTola,
             isBilled: updatedBasket.isBilled,
             isDiscarded: updatedBasket.isDiscarded,
             billingDate: updatedBasket.billingDate,
