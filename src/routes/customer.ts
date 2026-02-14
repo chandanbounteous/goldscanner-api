@@ -1049,6 +1049,10 @@ router.post('/basket/:basketId/article',
  *                           type: boolean
  *                         isDiscarded:
  *                           type: boolean
+ *                         billedGoldRate24KPerTola:
+ *                           type: number
+ *                           nullable: true
+ *                           description: The gold rate at which basket was billed (only present when isBilled is true)
  *                     articles:
  *                       type: array
  *                       items:
@@ -1300,6 +1304,7 @@ router.get('/basket/:basketId',
             extraDiscount: basket.extraDiscount,
             isBilled: basket.isBilled,
             isDiscarded: basket.isDiscarded,
+            billedGoldRate24KPerTola: basket.isBilled ? basket.billedGoldRate24KPerTola : null,
             createdAt: basket.createdAt,
             updatedAt: basket.updatedAt
           },
@@ -1585,13 +1590,47 @@ router.patch('/basket/:basketId',
       
       if (oldGoldItemCost !== undefined) updateData.oldGoldItemCost = parseFloat(oldGoldItemCost);
       if (extraDiscount !== undefined) updateData.extraDiscount = parseFloat(extraDiscount);
-      if (billedGoldRate24KPerTola !== undefined) updateData.billedGoldRate24KPerTola = parseFloat(billedGoldRate24KPerTola);
       if (isBilled !== undefined) updateData.isBilled = isBilled;
       if (billingDate !== undefined) updateData.billingDate = new Date(billingDate);
       if (billingDateNepali !== undefined) updateData.billingDateNepali = billingDateNepali;
       if (discardedDate !== undefined) updateData.discardedDate = new Date(discardedDate);
       if (discardedDateNepali !== undefined) updateData.discardedDateNepali = discardedDateNepali;
       if (isDiscarded !== undefined) updateData.isDiscarded = isDiscarded;
+
+      /**
+       * Special handling for billedGoldRate24KPerTola when isBilled is being set to true:
+       * 
+       * 1. If the basket has a fixed gold rate (isGoldRateFixed=true) AND 
+       *    the billing date is current date (today), then use the existing fixedGoldRate24KPerTola
+       *    value instead of the value passed in the request. This ensures consistency when
+       *    billing baskets with fixed rates on the same day they were created.
+       * 
+       * 2. Otherwise, use the billedGoldRate24KPerTola value provided in the request.
+       * 
+       * This logic prevents discrepancies between fixed rates and billed rates for same-day billing.
+       */
+      if (isBilled === true) {
+        const currentDate = new Date();
+        const billingDateToCheck = billingDate ? new Date(billingDate) : currentDate;
+        
+        // Check if billing date is today (same date, ignoring time)
+        const isBillingDateToday = 
+          billingDateToCheck.getFullYear() === currentDate.getFullYear() &&
+          billingDateToCheck.getMonth() === currentDate.getMonth() &&
+          billingDateToCheck.getDate() === currentDate.getDate();
+
+        if (existingBasket.isGoldRateFixed && 
+            existingBasket.fixedGoldRate24KPerTola && 
+            isBillingDateToday) {
+          // Use the existing fixed gold rate for billing
+          updateData.billedGoldRate24KPerTola = existingBasket.fixedGoldRate24KPerTola;
+        } else {
+          // Use the provided billedGoldRate24KPerTola from the request
+          if (billedGoldRate24KPerTola !== undefined) {
+            updateData.billedGoldRate24KPerTola = parseFloat(billedGoldRate24KPerTola);
+          }
+        }
+      }
 
       // Check if at least one field is provided for update
       if (Object.keys(updateData).length === 0) {
