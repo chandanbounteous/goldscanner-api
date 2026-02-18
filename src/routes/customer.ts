@@ -1992,7 +1992,7 @@ router.patch('/basket/article/:id',
     body('grossWeight').optional().isFloat({ min: 0.01, max: 1000 }).withMessage('Gross weight must be a positive number and cannot exceed 1000'),
     body('addOnCost').optional().isFloat({ min: 0.01 }).withMessage('Add-on cost must be a positive number'),
     body('wastage').optional().isFloat({ min: 0.01 }).withMessage('Wastage must be a positive number'),
-    body('makingCharge').optional().isFloat({ min: 0, max: 9999.99 }).withMessage('Making charge must be >= 0 and < 10000'),
+    body('makingCharge').optional().isFloat({ min: 0, max: 19999.99 }).withMessage('Making charge must be >= 0 and < 10000'),
     body('discount').optional().isFloat({ min: 0, max: 9999.99 }).withMessage('Discount must be >= 0 and < 10000')
   ],
   async (req: Request, res: Response) => {
