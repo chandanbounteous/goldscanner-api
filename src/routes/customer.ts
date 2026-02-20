@@ -1990,7 +1990,7 @@ router.patch('/basket/article/:id',
     param('id').isUUID().withMessage('Article ID must be a valid UUID'),
     body('netWeight').optional().isFloat({ min: 0.01 }).withMessage('Net weight must be a positive number greater than 0'),
     body('grossWeight').optional().isFloat({ min: 0.01, max: 1000 }).withMessage('Gross weight must be a positive number and cannot exceed 1000'),
-    body('addOnCost').optional().isFloat({ min: 0.01 }).withMessage('Add-on cost must be a positive number'),
+    body('addOnCost').optional().isFloat({ min: 0.00 }).withMessage('Add-on cost must be a positive number'),
     body('wastage').optional().isFloat({ min: 0.01 }).withMessage('Wastage must be a positive number'),
     body('makingCharge').optional().isFloat({ min: 0, max: 19999.99 }).withMessage('Making charge must be >= 0 and < 10000'),
     body('discount').optional().isFloat({ min: 0, max: 9999.99 }).withMessage('Discount must be >= 0 and < 10000')
