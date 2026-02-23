@@ -2594,12 +2594,16 @@ async function seedCarigars() {
   
   try {
     // Check if carigars already exist
-    const existingCount = await prisma.carigar.count();
+    // const existingCount = await prisma.carigar.count();
     
-    if (existingCount > 0) {
-      logger.info(`Found ${existingCount} existing carigars. Skipping seed.`);
-      return;
-    }
+    // if (existingCount > 0) {
+    //   logger.info(`Found ${existingCount} existing carigars. Skipping seed.`);
+    //   return;
+    // }
+    // Clear existing gold articles for re-seeding
+    logger.info('🗑️  Clearing existing carigars...');
+    const deletedCarigars = await prisma.carigar.deleteMany({});
+    logger.info(`Deleted ${deletedCarigars.count} existing carigars.`);
 
     // Create carigars
     const carigars = await Promise.all(
