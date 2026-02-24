@@ -100,7 +100,7 @@ export class InvoiceService {
     }
 
     // Extract number from GL-XXXX format
-    const lastNumber = parseInt(lastInvoice.invoiceNumber.split('-')[1]);
+    const lastNumber = parseInt(lastInvoice.invoiceNumber.split('-')[1] || '0');
     const nextNumber = lastNumber + 1;
     
     // Format with leading zeros (4 digits)
@@ -162,14 +162,14 @@ export class InvoiceService {
     });
 
     // Calculate subtotal
-    const totalNetWeight = articles.reduce((sum, article) => sum + article.netWeight, 0);
-    const totalGrossWeight = articles.reduce((sum, article) => sum + article.grossWeight, 0);
-    const totalMakingCharge = articles.reduce((sum, article) => sum + article.makingCharge, 0);
-    const totalAddOnCost = articles.reduce((sum, article) => sum + article.addOnCost, 0);
-    const totalDiscount = articles.reduce((sum, article) => sum + article.discount, 0);
+    const totalNetWeight = articles.reduce((sum: number, article: any) => sum + article.netWeight, 0);
+    const totalGrossWeight = articles.reduce((sum: number, article: any) => sum + article.grossWeight, 0);
+    const totalMakingCharge = articles.reduce((sum: number, article: any) => sum + article.makingCharge, 0);
+    const totalAddOnCost = articles.reduce((sum: number, article: any) => sum + article.addOnCost, 0);
+    const totalDiscount = articles.reduce((sum: number, article: any) => sum + article.discount, 0);
 
     // Calculate gold value at rate (sum of all article amounts)
-    const goldValueAtRate = articles.reduce((sum, article) => 
+    const goldValueAtRate = articles.reduce((sum: number, article: any) => 
       sum + article.articleInvoiceCalculations.totalAmountForWeightWithWastageAndStoneWeight, 0
     );
 
@@ -177,7 +177,7 @@ export class InvoiceService {
 
     // Calculate consolidated invoice calculations
     const consolidatedCalculations = GoldCalculator.calcConsolidatedInvoiceCalculations(
-      articles.map(a => ({ totalAmountForWeightWithWastageAndStoneWeight: a.articleInvoiceCalculations.totalAmountForWeightWithWastageAndStoneWeight })),
+      articles.map((a: any) => ({ totalAmountForWeightWithWastageAndStoneWeight: a.articleInvoiceCalculations.totalAmountForWeightWithWastageAndStoneWeight })),
       totalDiscount,
       basketData.extraDiscount
     );

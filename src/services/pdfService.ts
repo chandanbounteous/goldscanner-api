@@ -78,7 +78,7 @@ export class PDFService {
       const endTime = Date.now();
       logPDF(`PDF generated successfully in ${endTime - startTime}ms, size: ${pdfBuffer.length} bytes`);
 
-      return pdfBuffer;
+      return Buffer.from(pdfBuffer);
     } catch (error) {
       logPDFError('Error during PDF generation', {
         invoiceNumber,
