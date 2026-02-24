@@ -17,6 +17,7 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import goldRoutes from './routes/gold';
 import customerRoutes from './routes/customer';
+import invoiceRoutes from './routes/invoice';
 import healthRoutes from './routes/health';
 
 // Load environment variables
@@ -61,6 +62,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/gold', goldRoutes);
 app.use('/api/v1/customer', customerRoutes);
+app.use('/api/v1/invoice', invoiceRoutes);
 
 // Error handling middleware
 app.use(notFound);

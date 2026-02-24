@@ -146,4 +146,95 @@ export class GoldCalculator {
       totalBasketAmount
     };
   }
+
+  /**
+   * Calculate article-specific invoice calculations
+   * @param billedGoldRate24KPerTola - Gold rate used for billing (24K per tola)
+   * @param karat - Article karat
+   * @param netWeight - Net weight of the article in grams
+   * @param wastage - Wastage in grams
+   * @param stoneWeight - Stone weight in grams
+   * @returns Object containing article invoice calculations
+   */
+  static calcArticleInvoiceCalculations(
+    billedGoldRate24KPerTola: number,
+    karat: number,
+    netWeight: number,
+    wastage: number,
+    stoneWeight: number
+  ): {
+    ratePerGram: number;
+    totalWeightWithWastage: number;
+    totalAmountForWeightWithWastage: number;
+    totalWeightWithWastageAndStoneWeight: number;
+    totalAmountForWeightWithWastageAndStoneWeight: number;
+  } {
+    // Get gold rate per gram for the specific karat
+    const goldRateAsPerKaratPerTola = this.getGoldRateAsPerKarat(billedGoldRate24KPerTola, karat);
+    const ratePerGram = Math.round((goldRateAsPerKaratPerTola / this.ONE_TOLA_IN_GMS) * 100) / 100;
+
+    // Calculate total weight with wastage
+    const totalWeightWithWastage = Math.round((netWeight + wastage) * 100) / 100;
+
+    // Calculate amount for weight with wastage
+    const totalAmountForWeightWithWastage = Math.round((totalWeightWithWastage * ratePerGram) * 100) / 100;
+
+    // Calculate total weight including stone weight
+    const totalWeightWithWastageAndStoneWeight = Math.round((totalWeightWithWastage + stoneWeight) * 100) / 100;
+
+    // Calculate amount for weight with wastage and stone weight
+    const totalAmountForWeightWithWastageAndStoneWeight = Math.round((totalWeightWithWastageAndStoneWeight * ratePerGram) * 100) / 100;
+
+    return {
+      ratePerGram,
+      totalWeightWithWastage,
+      totalAmountForWeightWithWastage,
+      totalWeightWithWastageAndStoneWeight,
+      totalAmountForWeightWithWastageAndStoneWeight
+    };
+  }
+
+  /**
+   * Calculate consolidated invoice calculations
+   * @param articles - Array of article invoice calculations
+   * @param totalDiscount - Total discount from all articles
+   * @param extraDiscount - Extra discount on basket
+   * @returns Object containing consolidated invoice calculations
+   */
+  static calcConsolidatedInvoiceCalculations(
+    articles: Array<{ totalAmountForWeightWithWastageAndStoneWeight: number }>,
+    totalDiscount: number,
+    extraDiscount: number
+  ): {
+    consolidatedTotalAmountForAllArticles: number;
+    discount: number;
+    taxableAmount: number;
+    luxuryTax: number;
+    netAmount: number;
+  } {
+    // Sum total of all totalAmountForWeightWithWastageAndStoneWeight
+    const consolidatedTotalAmountForAllArticles = Math.round(
+      articles.reduce((sum, article) => sum + article.totalAmountForWeightWithWastageAndStoneWeight, 0) * 100
+    ) / 100;
+
+    // Total discount (article discounts + extra discount)
+    const discount = Math.round((totalDiscount + extraDiscount) * 100) / 100;
+
+    // Taxable amount (total - discount)
+    const taxableAmount = Math.round((consolidatedTotalAmountForAllArticles - discount) * 100) / 100;
+
+    // Calculate luxury tax
+    const luxuryTax = this.calcLuxuryTax(taxableAmount);
+
+    // Net amount (taxable + luxury tax)
+    const netAmount = Math.round((taxableAmount + luxuryTax) * 100) / 100;
+
+    return {
+      consolidatedTotalAmountForAllArticles,
+      discount,
+      taxableAmount,
+      luxuryTax,
+      netAmount
+    };
+  }
 }

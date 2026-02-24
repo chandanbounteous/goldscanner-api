@@ -87,6 +87,7 @@ model CustomerBasket {
   isDiscarded               Boolean                  @default(false)
   articles                  CustomerBasketArticles[]
   customer                  Customer                 @relation(fields: [customerId], references: [id])
+  invoice                   CustomerInvoice?
 
   @@map("customer_baskets")
 }
@@ -107,6 +108,19 @@ model CustomerBasketArticles {
   basket       CustomerBasket @relation(fields: [basketId], references: [id])
 
   @@map("customer_basket_articles")
+}
+
+model CustomerInvoice {
+  id              String         @id @default(uuid())
+  basketId        String         @unique
+  invoiceNumber   String         @unique
+  invoiceSnapshot Json           // Complete invoice snapshot
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  basket CustomerBasket @relation(fields: [basketId], references: [id])
+  
+  @@map("customer_invoices")
 }
 
 enum UserRole {

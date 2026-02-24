@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { ApiResponse } from '../types/auth';
 import { BasketService } from '../services/basketService';
+import { InvoiceService } from '../services/invoiceService';
 import { GoldRateFetcher } from '../services/goldRateFetcher';
 import { NepaliDateHelper } from '../utils/nepaliDateHelper';
 import NepaliDate, { BStoAD, ADtoBS } from 'nepali-date-library';
@@ -1648,11 +1649,54 @@ router.patch('/basket/:basketId',
         return;
       }
 
-      // Update the basket
+      // Update the basket with all provided data
       const updatedBasket = await prisma.customerBasket.update({
         where: { id: basketId },
-        data: updateData
+        data: updateData,
+        include: {
+          customer: true,
+          articles: {
+            include: {
+              article: {
+                include: {
+                  carigar: true
+                }
+              }
+            }
+          }
+        }
       });
+
+      // If basket was billed, create invoice after successful update
+      if (updateData.isBilled === true) {
+        try {
+          const user = (req as any).user;
+          const userId = user?.userId;
+          
+          // Check if invoice already exists to avoid duplicate creation
+          const invoiceExists = await prisma.customerInvoice.findUnique({
+            where: { basketId }
+          });
+          
+          if (!invoiceExists && userId) {
+            // Get user's full name for invoice metadata
+            const userDetails = await prisma.user.findUnique({
+              where: { id: userId },
+              select: { firstName: true, lastName: true, username: true }
+            });
+            
+            const createdByName = userDetails 
+              ? `${userDetails.firstName || ''} ${userDetails.lastName || ''}`.trim() || userDetails.username || 'system'
+              : 'system';
+            
+            await InvoiceService.createInvoice(basketId, createdByName);
+          }
+        } catch (error) {
+          console.error('Error creating invoice:', error);
+          // Note: We don't throw here to avoid rolling back the basket update
+          // The invoice can be created later if needed
+        }
+      }
 
       const response: ApiResponse = {
         responseCode: 200,
