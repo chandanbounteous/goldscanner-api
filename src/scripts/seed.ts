@@ -2636,6 +2636,12 @@ async function seedGoldArticles() {
   try {
     // Clear existing gold articles for re-seeding
     logger.info('🗑️  Clearing existing gold articles...');
+    const deletedBasketArticles = await prisma.customerBasketArticles.deleteMany({});
+    logger.info(`Deleted ${deletedBasketArticles.count} existing basket articles.`);
+    const deletedCustomerInvoices = await prisma.customerInvoice.deleteMany({});
+    logger.info(`Deleted ${deletedCustomerInvoices.count} existing customer invoices.`);
+    const deletedCustomerBaskets = await prisma.customerBasket.deleteMany({});
+    logger.info(`Deleted ${deletedCustomerBaskets.count} existing customer baskets.`);
     const deletedGoldArticles = await prisma.goldArticle.deleteMany({});
     logger.info(`Deleted ${deletedGoldArticles.count} existing gold articles.`);
 
