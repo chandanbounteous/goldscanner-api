@@ -408,7 +408,7 @@ export class PDFService {
               <td class="text-right">${NumberToWords.formatCurrency(article.articleInvoiceCalculations.ratePerGram)}</td>
               <td class="text-right">${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalAmountForWeightWithWastage)}</td>
               <td class="text-right">${NumberToWords.formatCurrency(article.makingCharge)}</td>
-              <td class="text-right">${NumberToWords.formatCurrency(article.stoneWeight)}</td>
+              <td class="text-right">${NumberToWords.formatCurrency(article.addOnCost)}</td>
               <td>${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalWeightWithWastageAndStoneWeight)}</td>
               <td class="text-right">${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalAmountForWeightWithWastageAndStoneWeight)}</td>
             </tr>
