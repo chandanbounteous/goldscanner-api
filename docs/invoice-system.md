@@ -102,6 +102,8 @@ GoldCalculator.calcArticleInvoiceCalculations(
   netWeight,
   wastage,
   stoneWeight,
+  makingCharge,
+  addOnCost
 );
 ```
 
@@ -111,25 +113,35 @@ Returns:
 - `totalWeightWithWastage`: Net weight + wastage
 - `totalAmountForWeightWithWastage`: Amount for weight including wastage
 - `totalWeightWithWastageAndStoneWeight`: Total weight including stones
-- `totalAmountForWeightWithWastageAndStoneWeight`: Final amount including stones
+- `totalAmountForWeightWithWastageStoneCostAndMakingCharge`: Final amount including wastage, stone cost, making charge, and add-on cost
 
 ### Consolidated Invoice Calculations
 
 ```typescript
 GoldCalculator.calcConsolidatedInvoiceCalculations(
-  articles,
+  subtotalBeforeDiscount,
   totalDiscount,
   extraDiscount,
+  oldGoldItemCost
 );
 ```
 
 Returns:
 
-- `consolidatedTotalAmountForAllArticles`: Sum of all article amounts
+- `consolidatedTotalAmountForAllArticles`: Subtotal before discount (sum of all article amounts including making charges and add-on costs)
+- `oldGoldItemCost`: Cost of old gold items being exchanged
 - `discount`: Total discounts (article + extra)
-- `taxableAmount`: Amount after discounts
+- `taxableAmount`: Amount after subtracting old gold cost and discounts
 - `luxuryTax`: 2% luxury tax on taxable amount
 - `netAmount`: Final amount including tax
+
+### Calculation Flow
+
+1. **Article Level**: Each article calculates its total amount including wastage, making charge, and add-on cost
+2. **Subtotal**: Sum all article amounts to get `subtotalBeforeDiscount`
+3. **Adjustments**: Subtract old gold item cost and discounts from subtotal to get `taxableAmount`
+4. **Tax Calculation**: Apply 2% luxury tax on taxable amount
+5. **Final Amount**: Add tax to taxable amount to get net amount
 
 ## Usage Examples
 

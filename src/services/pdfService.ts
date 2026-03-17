@@ -403,14 +403,14 @@ export class PDFService {
               <td class="text-left">${article.articleCode} - ${article.carigar?.codeName || ''}</td>
               <td>${article.karat}</td>
               <td>${NumberToWords.formatCurrency(article.netWeight)}</td>
-              <td>${NumberToWords.formatCurrency(article.wastage)}</td>
-              <td>${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalWeightWithWastage)}</td>
+              <td>${NumberToWords.formatCurrency(article.wastage,3)}</td>
+              <td>${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalWeightWithWastage,3)}</td>
               <td class="text-right">${NumberToWords.formatCurrency(article.articleInvoiceCalculations.ratePerGram)}</td>
               <td class="text-right">${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalAmountForWeightWithWastage)}</td>
               <td class="text-right">${NumberToWords.formatCurrency(article.makingCharge)}</td>
               <td class="text-right">${NumberToWords.formatCurrency(article.addOnCost)}</td>
-              <td>${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalWeightWithWastageAndStoneWeight)}</td>
-              <td class="text-right">${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalAmountForWeightWithWastageAndStoneWeight)}</td>
+              <td>${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalWeightWithWastageAndStoneWeight,3)}</td>
+              <td class="text-right">${NumberToWords.formatCurrency(article.articleInvoiceCalculations.totalAmountForWeightWithWastageStoneCostAndMakingCharge)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -432,6 +432,10 @@ export class PDFService {
           <div class="summary-row">
             <span class="summary-label">Bill Amount:</span>
             <span class="summary-value">${NumberToWords.formatCurrency(snapshot.calculations.consolidatedInvoiceCalculations.consolidatedTotalAmountForAllArticles)}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Purchase Amount:</span>
+            <span class="summary-value">${NumberToWords.formatCurrency(snapshot.calculations.consolidatedInvoiceCalculations.oldGoldItemCost)}</span>
           </div>
           <div class="summary-row">
             <span class="summary-label">Discount:</span>

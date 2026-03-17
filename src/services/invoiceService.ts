@@ -45,7 +45,7 @@ export interface InvoiceSnapshot {
       totalWeightWithWastage: number;
       totalAmountForWeightWithWastage: number;
       totalWeightWithWastageAndStoneWeight: number;
-      totalAmountForWeightWithWastageAndStoneWeight: number;
+      totalAmountForWeightWithWastageStoneCostAndMakingCharge: number;
     };
   }>;
   calculations: {
@@ -65,6 +65,7 @@ export interface InvoiceSnapshot {
     };
     consolidatedInvoiceCalculations: {
       consolidatedTotalAmountForAllArticles: number;
+      oldGoldItemCost:number;
       discount: number;
       taxableAmount: number;
       luxuryTax: number;
@@ -136,7 +137,9 @@ export class InvoiceService {
         article.karat,
         basketArticle.netWeight,
         basketArticle.wastage,
-        article.stoneWeight
+        article.stoneWeight,
+        basketArticle.makingCharge,
+        basketArticle.addOnCost
       );
 
       return {
@@ -168,18 +171,17 @@ export class InvoiceService {
     const totalAddOnCost = articles.reduce((sum: number, article: any) => sum + article.addOnCost, 0);
     const totalDiscount = articles.reduce((sum: number, article: any) => sum + article.discount, 0);
 
-    // Calculate gold value at rate (sum of all article amounts)
-    const goldValueAtRate = articles.reduce((sum: number, article: any) => 
-      sum + article.articleInvoiceCalculations.totalAmountForWeightWithWastageAndStoneWeight, 0
+    // Calculate subtotal before discount (sum of all article amounts)
+    const subtotalBeforeDiscount = articles.reduce((sum: number, article: any) => 
+      sum + article.articleInvoiceCalculations.totalAmountForWeightWithWastageStoneCostAndMakingCharge, 0
     );
-
-    const subtotalBeforeDiscount = goldValueAtRate + totalMakingCharge + totalAddOnCost;
 
     // Calculate consolidated invoice calculations
     const consolidatedCalculations = GoldCalculator.calcConsolidatedInvoiceCalculations(
-      articles.map((a: any) => ({ totalAmountForWeightWithWastageAndStoneWeight: a.articleInvoiceCalculations.totalAmountForWeightWithWastageAndStoneWeight })),
+      subtotalBeforeDiscount,
       totalDiscount,
-      basketData.extraDiscount
+      basketData.extraDiscount,
+      basketData.oldGoldItemCost
     );
 
     return {
@@ -206,7 +208,7 @@ export class InvoiceService {
         subtotal: {
           totalNetWeight: Math.round(totalNetWeight * 100) / 100,
           totalGrossWeight: Math.round(totalGrossWeight * 100) / 100,
-          goldValueAtRate: Math.round(goldValueAtRate * 100) / 100,
+          goldValueAtRate: Math.round(subtotalBeforeDiscount * 100) / 100,
           totalMakingCharge: Math.round(totalMakingCharge * 100) / 100,
           totalAddOnCost: Math.round(totalAddOnCost * 100) / 100,
           subtotalBeforeDiscount: Math.round(subtotalBeforeDiscount * 100) / 100

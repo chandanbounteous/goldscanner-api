@@ -154,6 +154,8 @@ export class GoldCalculator {
    * @param netWeight - Net weight of the article in grams
    * @param wastage - Wastage in grams
    * @param stoneWeight - Stone weight in grams
+   * @param makingCharge - Making charge for the article
+   * @param addOnCost - Additional cost for the article
    * @returns Object containing article invoice calculations
    */
   static calcArticleInvoiceCalculations(
@@ -161,67 +163,70 @@ export class GoldCalculator {
     karat: number,
     netWeight: number,
     wastage: number,
-    stoneWeight: number
+    stoneWeight: number,
+    makingCharge: number,
+    addOnCost: number
   ): {
     ratePerGram: number;
     totalWeightWithWastage: number;
     totalAmountForWeightWithWastage: number;
     totalWeightWithWastageAndStoneWeight: number;
-    totalAmountForWeightWithWastageAndStoneWeight: number;
+    totalAmountForWeightWithWastageStoneCostAndMakingCharge: number;
   } {
     // Get gold rate per gram for the specific karat
     const goldRateAsPerKaratPerTola = this.getGoldRateAsPerKarat(billedGoldRate24KPerTola, karat);
     const ratePerGram = Math.round((goldRateAsPerKaratPerTola / this.ONE_TOLA_IN_GMS) * 100) / 100;
 
     // Calculate total weight with wastage
-    const totalWeightWithWastage = Math.round((netWeight + wastage) * 100) / 100;
+    const totalWeightWithWastage = Math.round((netWeight + wastage) * 1000) / 1000;
 
     // Calculate amount for weight with wastage
     const totalAmountForWeightWithWastage = Math.round((totalWeightWithWastage * ratePerGram) * 100) / 100;
 
     // Calculate total weight including stone weight
-    const totalWeightWithWastageAndStoneWeight = Math.round((totalWeightWithWastage + stoneWeight) * 100) / 100;
+    const totalWeightWithWastageAndStoneWeight = Math.round((totalWeightWithWastage + stoneWeight) * 1000) / 1000;
 
-    // Calculate amount for weight with wastage and stone weight
-    const totalAmountForWeightWithWastageAndStoneWeight = Math.round((totalWeightWithWastageAndStoneWeight * ratePerGram) * 100) / 100;
+    // Calculate amount for weight with wastage, stone cost, and making charge
+    const totalAmountForWeightWithWastageStoneCostAndMakingCharge = Math.round((totalAmountForWeightWithWastage + addOnCost + makingCharge) * 100) / 100;
 
     return {
       ratePerGram,
       totalWeightWithWastage,
       totalAmountForWeightWithWastage,
       totalWeightWithWastageAndStoneWeight,
-      totalAmountForWeightWithWastageAndStoneWeight
+      totalAmountForWeightWithWastageStoneCostAndMakingCharge
     };
   }
 
   /**
    * Calculate consolidated invoice calculations
-   * @param articles - Array of article invoice calculations
+   * @param subtotalBeforeDiscount - Subtotal before discount
    * @param totalDiscount - Total discount from all articles
    * @param extraDiscount - Extra discount on basket
+   * @param oldGoldItemCost - Cost of old gold items
    * @returns Object containing consolidated invoice calculations
    */
   static calcConsolidatedInvoiceCalculations(
-    articles: Array<{ totalAmountForWeightWithWastageAndStoneWeight: number }>,
+    subtotalBeforeDiscount: number,
     totalDiscount: number,
-    extraDiscount: number
+    extraDiscount: number,
+    oldGoldItemCost: number
   ): {
     consolidatedTotalAmountForAllArticles: number;
+    oldGoldItemCost: number;
     discount: number;
     taxableAmount: number;
     luxuryTax: number;
     netAmount: number;
   } {
-    // Sum total of all totalAmountForWeightWithWastageAndStoneWeight
-    const consolidatedTotalAmountForAllArticles = Math.round(
-      articles.reduce((sum, article) => sum + article.totalAmountForWeightWithWastageAndStoneWeight, 0) * 100
-    ) / 100;
+    // Use the subtotal before discount
+    const consolidatedTotalAmountForAllArticles = subtotalBeforeDiscount;
 
     // Total discount (article discounts + extra discount)
     const discount = Math.round((totalDiscount + extraDiscount) * 100) / 100;
 
-    // Taxable amount (total - discount)
-    const taxableAmount = Math.round((consolidatedTotalAmountForAllArticles - discount) * 100) / 100;
+    // Taxable amount (total - old gold cost - discount)
+    const taxableAmount = Math.round((consolidatedTotalAmountForAllArticles - (oldGoldItemCost + discount)) * 100) / 100;
 
     // Calculate luxury tax
     const luxuryTax = this.calcLuxuryTax(taxableAmount);
@@ -231,6 +236,7 @@ export class GoldCalculator {
 
     return {
       consolidatedTotalAmountForAllArticles,
+      oldGoldItemCost,
       discount,
       taxableAmount,
       luxuryTax,

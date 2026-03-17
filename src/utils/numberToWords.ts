@@ -108,10 +108,10 @@ export class NumberToWords {
   /**
    * Format number with commas for display
    */
-  static formatCurrency(amount: number): string {
+  static formatCurrency(amount: number, max = 2, min = 2): string {
     return amount.toLocaleString('en-IN', {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2
+      maximumFractionDigits: max,
+      minimumFractionDigits: min
     });
   }
 }
